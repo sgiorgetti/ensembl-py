@@ -1,3 +1,7 @@
+from typing import TypeVar
+
+TMetadata = TypeVar("TMetadata", bound="Metadata")
+
 class Metadata(object):
 
     def __init__(self, accession_id, value=None) -> None:
