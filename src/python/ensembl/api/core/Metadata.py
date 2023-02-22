@@ -1,8 +1,5 @@
-from typing import TypeVar
 
-TMetadata = TypeVar("TMetadata", bound="Metadata")
-
-class Metadata(object):
+class Metadata():
 
     def __init__(self, accession_id, value=None) -> None:
         if accession_id is None:

@@ -11,15 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""API core module"""
-
-from .Exon import *
-from .Gene import *
-from .Location import *
-from .Metadata import *
-from .Region import *
-from .Slice import *
-from .Strand import *
-from .Transcript import *
-from .ValueSetMetadata import *
-from .XrefMetadata import *
+"""Ensembl API dbsql module"""
+from .ExonAdaptor import *
+from .SliceAdaptor import *
+from .CoordSystemAdaptor import *

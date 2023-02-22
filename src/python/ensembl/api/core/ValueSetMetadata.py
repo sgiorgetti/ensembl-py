@@ -1,7 +1,7 @@
-import Metadata
+from ensembl.api.core.Metadata import Metadata
 from typing import Optional
 
-class ValueSetMetadata(object, Metadata):
+class ValueSetMetadata(Metadata):
     def __init__(self, accession_id:str, value:str=None,
                  label:Optional[str]=None, definition:Optional[str]=None, 
                  description:Optional[str]=None) -> None:

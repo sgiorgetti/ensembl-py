@@ -1,6 +1,6 @@
-from Metadata import Metadata
+from ensembl.api.core.Metadata import Metadata
 from enum import Enum
-from typing import Dict
+from typing import Dict, Union, Optional
 
 class RegionCode(Enum):
     CHROMOSOME = 1
@@ -27,23 +27,35 @@ class Region(object):
       Exception: ???
     """
  
-    def __init__(self, name: str, code: RegionCode, topology: RegionTopology, length: int, fasta_file: str) -> None:
+    def __init__(self, 
+                 name: str,
+                 code: Union[str, RegionCode],
+                 topology: Union[str, RegionTopology],
+                 length: int,
+                 assembly: str,
+                 fasta_file: Optional[str] = None
+                ) -> None:
         self.__name = name
         self._code = code
-        self._topology = topology
+        self._topology = topology if isinstance(topology, RegionTopology) else RegionTopology[topology.upper()]
         self._length = length
+        self._assembly = assembly
         self._fasta_file_url = fasta_file
 
     def __repr__(self) -> str:
-        return f"I am {self.__name}: an Ensembl region!"
+        return f'{self.__class__.__name__}({self.name},{self._topology.name},{self._code},{self._assembly})'
 
     @property
-    def name(self) -> str:
-        return self.__name
+    def assembly(self) -> str:
+        return self._assembly
 
     @property
     def code(self) -> RegionCode:
         return self._code
+    
+    @property
+    def name(self) -> str:
+        return self.__name
 
     @property
     def fasta_file_url(self) -> str:

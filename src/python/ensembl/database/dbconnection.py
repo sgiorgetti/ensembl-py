@@ -18,7 +18,7 @@ that is, the data can only be accessed via SQL queries (see example below).
 
 Typical usage example::
 
-    import ensembl.database.DBConnection
+    import ensembl.database.dbconnection
     dbc = ensembl.database.DBConnection('mysql://ensro@mysql-server:4242/mydb')
     # You can access the database data via sql queries, for instance:
     results = dbc.execute('SELECT * FROM my_table;')
@@ -63,8 +63,8 @@ class DBConnection:
     def load_metadata(self) -> None:
         """Loads the metadata information of the database."""
         # Note: Just reflect() is not enough as it would not delete tables that no longer exist
-        self._metadata = sqlalchemy.MetaData(bind=self._engine)
-        self._metadata.reflect()
+        self._metadata = sqlalchemy.MetaData()
+        self._metadata.reflect(bind=self._engine)
 
     @property
     def url(self) -> str:

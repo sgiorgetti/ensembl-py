@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 class Location(object):
     """Representation of a location.
@@ -14,14 +14,14 @@ class Location(object):
       Exception: ???
     """
  
-    def __init__(self, start: int, end: int, length: int, location_modifier: Any =None) -> None:
+    def __init__(self, start: int, end: int, length: int, location_modifier: Optional[Any] = None) -> None:
         self._start = start
         self._end = end
         self._length = length
         self._location_modifier = location_modifier
 
     def __repr__(self) -> str:
-        return f"I am an Ensembl location!"
+        return f'{self.__class__.__name__}({self._start},{self._end},{self._length})'
 
     @property
     def start(self) -> int:

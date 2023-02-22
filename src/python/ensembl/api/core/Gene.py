@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
-from Metadata import Metadata
-from Transcript import Transcript
+from ensembl.api.core.Metadata import Metadata
+from ensembl.api.core.Transcript import Transcript
 
 class Gene(object):
 

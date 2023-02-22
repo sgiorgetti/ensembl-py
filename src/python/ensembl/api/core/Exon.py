@@ -1,6 +1,6 @@
-from Metadata import Metadata
+from ensembl.api.core.Metadata import Metadata
+from ensembl.api.core.Slice import Slice
 from typing import Dict, Any
-
 
 class Exon(object):
     """Representation of an exon.
@@ -24,19 +24,27 @@ class Exon(object):
 
     __type = 'Exon'
  
-    def __init__(self) -> None:
-        pass
+    def __init__(self,
+                 stable_id: str,
+                 slice: Slice,
+                 start_phase: int,
+                 end_phase: int
+                ) -> None:
+        if not stable_id:
+            raise ValueError()
+        if not Slice:
+            raise ValueError()
+        if stable_id.find('.') < 0:
+            raise ValueError()
+        (self._unversioned_stable_id, self._version) = stable_id.split('.')
+        self._slice = slice
+        self._start_phase = start_phase
+        self._end_phase = end_phase
+        self._metadata = {}
+    # (1, 1, 76835377, 76835502, -1, -1, -1, 1, 0, 'ENSE00002089356', 1, datetime.datetime(2022, 7, 5, 10, 44, 45), datetime.datetime(2022, 7, 5, 10, 44, 45))
 
     def __repr__(self) -> str:
-        return f"I am an Ensembl exon!"
-
-    @property
-    def external_id(self) -> str:
-        return self._external_id
-
-    @external_id.setter
-    def external_id(self, value: str) -> None:
-        self._external_id = value
+        return f'{self.__class__.__name__}({self.stable_id})'
     
     @property
     def stable_id(self) -> str:
@@ -65,6 +73,14 @@ class Exon(object):
     @version.setter
     def version(self, value) -> None:
         self._version = value
+
+    @property
+    def start_phase(self):
+        return self._start_phase
+
+    @property
+    def end_phase(self):
+        return self._end_phase
     
     def get_metadata(self) -> Dict[str, Metadata]:
         return self._metadata
@@ -72,8 +88,11 @@ class Exon(object):
     def set_metadata(self, metadata_item: Dict[str, Metadata]) -> None:
         self._metadata = metadata_item
 
-    def get_slice(self) -> Any:
+    def add_metadata(self, meta_key: str, meta_value: Metadata) -> None:
+        self._metadata[meta_key] = meta_value
+
+    def get_slice(self) -> Slice:
         return self._slice
     
-    def set_slice(self, slice: Any) -> None:
+    def set_slice(self, slice: Slice) -> None:
         self._slice = slice

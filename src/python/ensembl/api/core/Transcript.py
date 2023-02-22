@@ -1,5 +1,5 @@
-from Metadata import Metadata
-from Exon import Exon
+from ensembl.api.core.Metadata import Metadata
+from ensembl.api.core.Exon import Exon
 from typing import Dict, List, Any
 
 class Transcript(object):

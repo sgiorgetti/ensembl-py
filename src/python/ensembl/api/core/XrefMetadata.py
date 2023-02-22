@@ -1,7 +1,7 @@
-import Metadata
+from ensembl.api.core.Metadata import Metadata
 from typing import Any, Optional
 
-class XrefMetadata(object, Metadata):
+class XrefMetadata(Metadata):
     def __init__(self, accession_id=None, value=None, url:Optional[str]=None, source:Optional[Any]=None) -> None:
         super().__init__(accession_id, value)
         if url is not None:

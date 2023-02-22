@@ -1,5 +1,8 @@
 {
     "python.analysis.extraPaths": [
-        "./src/python/ensembl/api/core"
-    ]
+        "/home/stefano/ensembl-py/src/python"
+    ],
+    "terminal.integrated.env.linux": {
+        "PYTHONPATH": "/home/stefano/ensembl-py/src/python"
+    }
 }
