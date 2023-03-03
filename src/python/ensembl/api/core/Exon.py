@@ -1,6 +1,9 @@
 from ensembl.api.core.Metadata import Metadata
 from ensembl.api.core.Slice import Slice
-from typing import Dict, Any
+from ensembl.api.core.Location import Location
+from typing import Dict, Optional
+
+__all__ = ['Exon', 'SplicedExon']
 
 class Exon(object):
     """Representation of an exon.
@@ -27,7 +30,7 @@ class Exon(object):
     def __init__(self,
                  stable_id: str,
                  slice: Slice,
-                 start_phase: int,
+                 phase: int,
                  end_phase: int
                 ) -> None:
         if not stable_id:
@@ -38,7 +41,7 @@ class Exon(object):
             raise ValueError()
         (self._unversioned_stable_id, self._version) = stable_id.split('.')
         self._slice = slice
-        self._start_phase = start_phase
+        self._phase = phase
         self._end_phase = end_phase
         self._metadata = {}
     # (1, 1, 76835377, 76835502, -1, -1, -1, 1, 0, 'ENSE00002089356', 1, datetime.datetime(2022, 7, 5, 10, 44, 45), datetime.datetime(2022, 7, 5, 10, 44, 45))
@@ -75,12 +78,25 @@ class Exon(object):
         self._version = value
 
     @property
-    def start_phase(self):
-        return self._start_phase
+    def phase(self) -> int:
+        return self._phase
 
     @property
-    def end_phase(self):
+    def end_phase(self) -> int:
         return self._end_phase
+
+    @property
+    def frame(self):
+        location = self._slice.location
+        if self._phase == -1:
+            return '.' # gff convention for no frame info
+        if self._phase == 0:
+            return location.start%3
+        if self._phase == 1:
+            return (location.start + 2)%3
+        if self._phase == 2:
+            return (location.start + 1)%3
+        raise Exception(f"bad phase in exon {self.phase}")
     
     def get_metadata(self) -> Dict[str, Metadata]:
         return self._metadata
@@ -96,3 +112,32 @@ class Exon(object):
     
     def set_slice(self, slice: Slice) -> None:
         self._slice = slice
+
+
+class SplicedExon(Exon):
+    def __init__(self,
+                 stable_id: str,
+                 slice: Slice,
+                 phase: int,
+                 end_phase: int,
+                 index: int,
+                 relative_location: Location = None,
+                ) -> None:
+        Exon.__init__(self,
+                       stable_id,
+                       slice,
+                       phase,
+                       end_phase
+        )
+        self._index = index
+        self._relative_location = relative_location
+    
+    @property
+    def index(self) -> int:
+        return self._index
+    
+    def get_relative_location(self) -> Location:
+        return self._relative_location
+    
+    def set_relative_location(self, relative_location: Location) -> None:
+        self._relative_location = relative_location

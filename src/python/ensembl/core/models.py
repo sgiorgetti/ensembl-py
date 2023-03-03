@@ -52,8 +52,9 @@ from sqlalchemy.dialects.mysql import (
     TINYTEXT,
     VARCHAR,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
 from sqlalchemy.ext.declarative import declarative_base
+from typing import List
 
 Base = declarative_base()
 metadata = Base.metadata
@@ -469,18 +470,29 @@ class Transcript(Base):
     modified_date = Column(DateTime)
 
     analysis = relationship(
-        "Analysis", primaryjoin="Transcript.analysis_id == Analysis.analysis_id"
+        "Analysis",
+        primaryjoin="Transcript.analysis_id == Analysis.analysis_id"
     )
     canonical_translation = relationship(
         "Translation",
         primaryjoin="Transcript.canonical_translation_id == Translation.translation_id",
     )
     display_xref = relationship(
-        "Xref", primaryjoin="Transcript.display_xref_id == Xref.xref_id"
+        "Xref",
+        primaryjoin="Transcript.display_xref_id == Xref.xref_id"
     )
-    gene = relationship("Gene", primaryjoin="Transcript.gene_id == Gene.gene_id")
+    exons: Mapped[List["ExonTranscript"]] = relationship(back_populates="transcript")
+    gene = relationship(
+        "Gene",
+        primaryjoin="Transcript.gene_id == Gene.gene_id"
+    )
     seq_region = relationship(
-        "SeqRegion", primaryjoin="Transcript.seq_region_id == SeqRegion.seq_region_id"
+        "SeqRegion",
+        primaryjoin="Transcript.seq_region_id == SeqRegion.seq_region_id"
+    )
+    transcript_attribs = relationship(
+        "TranscriptAttrib",
+        primaryjoin="Transcript.transcript_id == TranscriptAttrib.transcript_id"
     )
 
 
@@ -993,6 +1005,8 @@ class TranscriptAttrib(Base):
     )
     value = Column(Text, primary_key=True, nullable=False, index=True)
 
+    attribs = relationship("AttribType", primaryjoin="TranscriptAttrib.attrib_type_id == AttribType.attrib_type_id")
+
 
 #  t_transcript_attrib = Table(
 #      "transcript_attrib",
@@ -1502,6 +1516,8 @@ class Exon(Base):
     seq_region = relationship(
         "SeqRegion", primaryjoin="Exon.seq_region_id == SeqRegion.seq_region_id"
     )
+
+    transcripts: Mapped[List["ExonTranscript"]] = relationship(back_populates="exon")
 
 
 class ExternalSynonym(Base):
@@ -2118,13 +2134,8 @@ class ExonTranscript(Base):
         index=True,
     )
     rank = Column(INTEGER(10), primary_key=True, nullable=False)
-
-    exon = relationship("Exon", primaryjoin="ExonTranscript.exon_id == Exon.exon_id")
-    transcript = relationship(
-        "Transcript",
-        primaryjoin="ExonTranscript.transcript_id == Transcript.transcript_id",
-    )
-
+    exon: Mapped["Exon"] = relationship(back_populates="transcripts")
+    transcript: Mapped["Transcript"] = relationship(back_populates="exons")
 
 class MiscAttrib(Base):
     __tablename__ = "misc_attrib"

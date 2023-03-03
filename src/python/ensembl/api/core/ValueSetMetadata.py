@@ -1,18 +1,31 @@
 from ensembl.api.core.Metadata import Metadata
-from typing import Optional
+
+__all__ = ['ValueSetMetadata']
 
 class ValueSetMetadata(Metadata):
-    def __init__(self, accession_id:str, value:str=None,
-                 label:Optional[str]=None, definition:Optional[str]=None, 
-                 description:Optional[str]=None) -> None:
-        super().__init__(accession_id, value)
-        if label:
+    def __init__(self,
+                 accession_id: str,
+                 value: str = '',
+                 label: str = '',
+                 definition: str = '', 
+                 description: str = '' 
+        ) -> None:
+        if label is not None:
             self._label = label
-        if definition:
+        if definition is not None:
             self._definition = definition
-        if description:
+        if description is not None:
             self._description = description
+        super().__init__(accession_id, value)
 
+    @property
+    def accession_id(self) -> str:
+        return super().accession_id
+    
+    @property
+    def value(self) -> str:
+        return super().value
+    
     @property
     def label(self) -> str:
         return self._label

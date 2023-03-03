@@ -1,7 +1,5 @@
 __all__ = ['ArgumentError']
 
-from ensembl.database.dbconnection import DBConnection
-
 # class DBAdaptor():
 #     """Contains all the region related functions over seq_region and coord_system ORM
 

@@ -9,7 +9,7 @@ from ensembl.core.models import Meta as MetaORM
 from typing import Any, List, Optional
 
 from ensembl.database.dbconnection import DBConnection
-from ensembl.api.dbsql.DBAdaptor import ArgumentError
+from ensembl.api.dbsql.Exceptions import ArgumentError
 
 class CoordSystem():
     """

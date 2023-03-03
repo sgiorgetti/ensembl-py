@@ -11,8 +11,4 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Ensembl API dbsql modules"""
-from .TranscriptAdaptor import *
-from .ExonAdaptor import *
-from .SliceAdaptor import *
-from .CoordSystemAdaptor import *
+"""Ensembl API fileio modules"""

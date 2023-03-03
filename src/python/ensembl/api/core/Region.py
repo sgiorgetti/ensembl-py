@@ -6,6 +6,7 @@ class RegionCode(Enum):
     CHROMOSOME = 1
     PLASMID = 2
     SCAFFOLD = 3
+    CONTIG = 4
 
 class RegionTopology(Enum):
     LINEAR = 1
@@ -30,6 +31,8 @@ class Region(object):
     def __init__(self, 
                  name: str,
                  code: Union[str, RegionCode],
+                 is_top_level: bool,
+                 rank: Optional[int],
                  topology: Union[str, RegionTopology],
                  length: int,
                  assembly: str,
@@ -37,6 +40,8 @@ class Region(object):
                 ) -> None:
         self.__name = name
         self._code = code
+        self._is_top_level = is_top_level,
+        self._rank = rank,
         self._topology = topology if isinstance(topology, RegionTopology) else RegionTopology[topology.upper()]
         self._length = length
         self._assembly = assembly
@@ -64,6 +69,14 @@ class Region(object):
     @property
     def length(self) -> int:
         return self._length
+    
+    @property
+    def is_top_level(self) -> bool:
+        return self._is_top_level
+    
+    @property
+    def rank(self) -> int:
+        return self._rank
 
     @property
     def topology(self) -> RegionTopology:

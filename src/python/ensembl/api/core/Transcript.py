@@ -1,6 +1,10 @@
 from ensembl.api.core.Metadata import Metadata
-from ensembl.api.core.Exon import Exon
+from ensembl.api.core.Exon import SplicedExon
+from ensembl.api.core.Slice import Slice
+from ensembl.api.core.Location import Location
 from typing import Dict, List, Any
+
+__all__ = ['Transcript']
 
 class Transcript(object):
     """Representation of a transcript.
@@ -28,23 +32,24 @@ class Transcript(object):
 
     __type = 'Transcript'
  
-    def __init__(self, name: str=None) -> None:
-        self._name = name
+    def __init__(self,
+                 stable_id: str,
+                 slice: Slice,
+                 relative_location: Location = None,
+                ) -> None:
+        if not stable_id:
+            raise ValueError()
+        if not Slice:
+            raise ValueError()
+        if stable_id.find('.') < 0:
+            raise ValueError()
+        (self._unversioned_stable_id, self._version) = stable_id.split('.')
+        self._slice = slice
+        self._relative_location = relative_location
+        self._metadata = {}
 
     def __repr__(self) -> str:
-        return f"I am an Ensembl transcript! I am {self._name}!!!"
-
-    @property
-    def external_id(self) -> str:
-        return self._external_id
-
-    @external_id.setter
-    def external_id(self, value: str) -> None:
-        self._external_id = value
-
-    @property
-    def name(self) -> str:
-        return self._name
+        return f'{self.__class__.__name__}({self.stable_id})'
     
     @property
     def stable_id(self) -> str:
@@ -82,10 +87,10 @@ class Transcript(object):
     def version(self, value) -> None:
         self._version = value
 
-    def get_exons(self) -> List[Exon]:
+    def get_exons(self) -> List[SplicedExon]:
         return self._exons
     
-    def set_exons(self, exons: List[Exon]) -> None:
+    def set_exons(self, exons: List[SplicedExon]) -> None:
         self._exons = exons
 
     def get_introns(self) -> List[Any]:
@@ -100,8 +105,17 @@ class Transcript(object):
     def set_metadata(self, metadata_item: Dict[str, Metadata]) -> None:
         self._metadata = metadata_item
 
-    def get_slice(self) -> Any:
+    def add_metadata(self, meta_key: str, meta_value: Metadata) -> None:
+        self._metadata[meta_key] = meta_value
+
+    def get_slice(self) -> Slice:
         return self._slice
     
-    def set_slice(self, slice: Any) -> None:
+    def set_slice(self, slice: Slice) -> None:
         self._slice = slice
+
+    def get_relative_location(self) -> Location:
+        return self._relative_location
+    
+    def set_relative_location(self, relative_location: Location) -> None:
+        self._relative_location = relative_location

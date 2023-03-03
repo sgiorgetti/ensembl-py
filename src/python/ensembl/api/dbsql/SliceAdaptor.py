@@ -1,5 +1,3 @@
-__all__ = ['SliceAdaptor']
-
 from sqlalchemy import select, func, text
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
@@ -10,8 +8,10 @@ from ensembl.core.models import SeqRegionAttrib as SeqRegionAttribORM
 from typing import List, Optional
 
 from ensembl.database.dbconnection import DBConnection
-from ensembl.api.dbsql.DBAdaptor import ArgumentError
+from ensembl.api.dbsql.Exceptions import ArgumentError
 from ensembl.api.core import Slice, Region, Location, Strand
+
+__all__ = ['SliceAdaptor']
 
 class SliceAdaptor():
     """Contains all the slice related functions over Slice ORM
@@ -82,7 +82,7 @@ class SliceAdaptor():
                 raise NoResultFound(f'Could not find any region with name {seq_region_name} and coordinate {coord_system}')
             for row in rows:
                 topology = 'CIRCULAR' if cls._is_circular(session, row.seq_region_id) else 'LINEAR'
-                region = Region(row.sr_name, row.cs_name, topology, row.sr_length, row.cs_version)
+                region = Region(row.sr_name, row.cs_name, is_top_level=True, rank=None, topology=topology, length=row.sr_length, assembly=row.cs_version)
                 location = Location(start, end, row.sr_length)
                 st = Strand.REVERSE if strand == -1 else Strand.FORWARD
                 slices.append(Slice(location, region, st))
@@ -118,7 +118,7 @@ class SliceAdaptor():
 
         result = session.execute(stmt).first()
         topology = 'CIRCULAR' if cls._is_circular(session, result.seq_region_id) else 'LINEAR'
-        region = Region(result.sr_name, result.cs_name, topology, result.sr_length, result.cs_version)
+        region = Region(result.sr_name, result.cs_name, is_top_level=True, rank=None, topology=topology, length=result.sr_length, assembly=result.cs_version)
         # location = Location(start, end, row.sr_length)
         # st = Strand.REVERSE if strand == -1 else Strand.FORWARD
         return Slice(region=region)

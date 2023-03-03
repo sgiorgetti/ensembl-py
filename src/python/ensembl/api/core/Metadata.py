@@ -1,11 +1,15 @@
+__all__ = ['Metadata']
 
 class Metadata():
 
-    def __init__(self, accession_id, value=None) -> None:
+    def __init__(self,
+                 accession_id: str,
+                 value: str = '') -> None:
         if accession_id is None:
             raise ValueError('An accession_id value must be set')
         if value is not None:
             self._value = value
+        self._accession_id = accession_id
 
     def __repr__(self) -> str:
         return f"{self._accession_id}-{self._value}"

@@ -7,7 +7,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from typing import Any, Union, List, Dict, Optional
 
 from ensembl.database.dbconnection import DBConnection
-from DBAdaptor import DBAdaptor, ArgumentError
+from ensembl.api.dbsql.Exceptions import DBAdaptor, ArgumentError
 from ensembl.api.core import Slice, Region, Location, Strand
 
 class SliceAdaptor(DBAdaptor):
