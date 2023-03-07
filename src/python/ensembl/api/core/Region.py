@@ -1,4 +1,5 @@
 from ensembl.api.core.Metadata import Metadata
+from ensembl.api.core.Assembly import Assembly
 from enum import Enum
 from typing import Dict, Union, Optional
 
@@ -35,7 +36,7 @@ class Region(object):
                  rank: Optional[int],
                  topology: Union[str, RegionTopology],
                  length: int,
-                 assembly: str,
+                 assembly: Union[Assembly, str],
                  fasta_file: Optional[str] = None
                 ) -> None:
         self.__name = name
@@ -48,10 +49,10 @@ class Region(object):
         self._fasta_file_url = fasta_file
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.name},{self._topology.name},{self._code},{self._assembly})'
+        return f'{self.__class__.__name__}({self.name},{self._topology.name},{self._code})'
 
     @property
-    def assembly(self) -> str:
+    def assembly(self) -> Union[Assembly, str]:
         return self._assembly
 
     @property

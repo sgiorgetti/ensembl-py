@@ -16,3 +16,4 @@ from .TranscriptAdaptor import *
 from .ExonAdaptor import *
 from .SliceAdaptor import *
 from .CoordSystemAdaptor import *
+from .AssemblyAdaptor import *

@@ -1,5 +1,3 @@
-__all__ = ['CoordSystemAdaptor', 'CoordSystem']
-
 from sqlalchemy import select, func
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -10,6 +8,8 @@ from typing import Any, List, Optional
 
 from ensembl.database.dbconnection import DBConnection
 from ensembl.api.dbsql.Exceptions import ArgumentError
+
+__all__ = ['CoordSystemAdaptor', 'CoordSystem']
 
 class CoordSystem():
     """

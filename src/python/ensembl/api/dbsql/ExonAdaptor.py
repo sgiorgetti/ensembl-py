@@ -101,7 +101,8 @@ class ExonAdaptor():
         )
         exons: List[SplicedExon] = []
         for er in exon_rows:
-            exons.append(ExonAdaptor._exonrow_to_splicedexon(transcript.get_slice(), er))
+            # exons.append(ExonAdaptor._exonrow_to_splicedexon(transcript.get_slice(), er))
+            exons.append(ExonAdaptor._exonrow_to_splicedexon(transcript, er))
         # transcript.set_exons(exons)
         return exons
             
@@ -120,14 +121,15 @@ class ExonAdaptor():
         return e
     
     @classmethod
-    def _exonrow_to_splicedexon(cls, transcript_slice: Slice, row: Row) -> SplicedExon:
-        slice = Slice(region=transcript_slice.region, strand=transcript_slice.strand)
+    def _exonrow_to_splicedexon(cls, transcript: Transcript, row: Row) -> SplicedExon:
+        slice = Slice(region=transcript.get_slice().region, strand=transcript.get_slice().strand)
         sr_len = row.Exon.seq_region_end - row.Exon.seq_region_start
         slice.location = Location(row.Exon.seq_region_start, row.Exon.seq_region_end, sr_len)
         strand = Strand.REVERSE if row.Exon.seq_region_strand == -1 else Strand.FORWARD
         if slice.strand != strand:
             raise Exception("STRAND!!!!") 
         e = SplicedExon('.'.join((str(row.Exon.stable_id), str(row.Exon.version))), slice, row.Exon.phase, row.Exon.end_phase, row.ExonTranscript.rank)
+        e.add_metadata('source', ValueSetMetadata('exon.source', transcript.get_metadata('source').value))
         e.add_metadata('is_current', ValueSetMetadata('exon.is_current', row.Exon.is_current))
         e.add_metadata('is_constitutive', ValueSetMetadata('exon.is_constitutive', row.Exon.is_constitutive))
         e.add_metadata('created_date', ValueSetMetadata('exon.created_date', row.Exon.created_date))

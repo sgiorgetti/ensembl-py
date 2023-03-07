@@ -13,6 +13,7 @@
 # limitations under the License.
 """API core module"""
 
+from .Assembly import *
 from .Exon import *
 from .Gene import *
 from .Location import *

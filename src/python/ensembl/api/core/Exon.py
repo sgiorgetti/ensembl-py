@@ -1,7 +1,7 @@
 from ensembl.api.core.Metadata import Metadata
 from ensembl.api.core.Slice import Slice
 from ensembl.api.core.Location import Location
-from typing import Dict, Optional
+from typing import Dict, Any, Optional, Union
 
 __all__ = ['Exon', 'SplicedExon']
 
@@ -25,7 +25,7 @@ class Exon(object):
       Exception: when start is greater than end
     """
 
-    __type = 'Exon'
+    __type = 'exon'
  
     def __init__(self,
                  stable_id: str,
@@ -98,8 +98,10 @@ class Exon(object):
             return (location.start + 1)%3
         raise Exception(f"bad phase in exon {self.phase}")
     
-    def get_metadata(self) -> Dict[str, Metadata]:
-        return self._metadata
+    def get_metadata(self, md: Optional[str] = None) -> Union[Metadata, Dict[str, Metadata]]:
+        if md is None:
+            return self._metadata
+        return self._metadata.get(md)
     
     def set_metadata(self, metadata_item: Dict[str, Metadata]) -> None:
         self._metadata = metadata_item
@@ -112,6 +114,31 @@ class Exon(object):
     
     def set_slice(self, slice: Slice) -> None:
         self._slice = slice
+
+    def is_constitutive(self) -> bool:
+        if self._metadata.get('is_constitutive').value == 1:
+            return True
+        return False
+
+    def get_summary(self) -> Dict[str, str]:
+        """
+        Example       : exon_summary = exon.get_summary()
+        Description   : Retrieves a textual summary of this Feature.
+        Returns       : Dict[str, str]
+        Status        : Alpha - Intended for internal use
+        """
+        summary = {}
+        summary['id'] = self.unversioned_stable_id
+        summary['exon_id'] = self.unversioned_stable_id
+        summary['version'] = self.version if self.version else ''
+        summary['start'] = self._slice.location.start
+        summary['end'] = self._slice.location.end
+        summary['strand'] = self._slice.strand.value
+        summary['seq_region_name'] = self._slice.region.name
+        summary['constitutive'] = self._metadata.get('is_constitutive').value
+        summary['ensembl_phase'] = self._phase
+        summary['ensembl_end_phase'] = self._end_phase
+        return summary
 
 
 class SplicedExon(Exon):
@@ -141,3 +168,30 @@ class SplicedExon(Exon):
     
     def set_relative_location(self, relative_location: Location) -> None:
         self._relative_location = relative_location
+
+    def get_summary(self) -> Dict[str, str]:
+        """
+        Example       : exon_summary = exon.get_summary()
+        Description   : Retrieves a textual summary of this Feature.
+        Returns       : Dict[str, str]
+        Status        : Alpha - Intended for internal use
+        """
+        summary = super().get_summary()
+        summary['exon_index'] = self._index
+        return summary
+    
+    # 1       havana  exon    65419   65433   .       +       .       Parent=transcript:ENST00000641515;Name=ENSE00003812156;constitutive=1;ensembl_end_phase=-1;ensembl_phase=-1;exon_id=ENSE00003812156;rank=1;version=1
+    def gff3_qualifiers(self) -> Dict[str, Union[str, tuple[str]]]:
+        qualifiers = {
+            'source': self.get_metadata('source').value,
+            'score': ".",
+            'Name': self._unversioned_stable_id,
+            'constitutive': self._metadata.get('is_constitutive').value,
+            'ensembl_phase': self._phase,
+            'ensembl_end_phase': self._end_phase,
+            'exon_id': self._unversioned_stable_id,
+            'rank': self._index,
+            'version': self.version
+        }
+
+        return qualifiers
