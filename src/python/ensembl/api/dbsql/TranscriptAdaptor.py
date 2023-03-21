@@ -6,7 +6,7 @@ from sqlalchemy.engine.row import Row
 from ensembl.core.models import Transcript as TranscriptORM, TranscriptAttrib as TranscriptAttribORM, AttribType as AttribTypeORM
 from ensembl.core.models import Biotype, Xref, Analysis
 
-from typing import Union, List
+from typing import Union
 
 from ensembl.api.core import Transcript, Location, Strand, ValueSetMetadata
 from ensembl.api.dbsql.SliceAdaptor import SliceAdaptor
@@ -30,8 +30,9 @@ class TranscriptAdaptor():
     @classmethod
     def fetch_by_stable_id(cls, session: Session, stable_id: str) -> Transcript:
         """
-        Arg [1]    : str stable_id
-            the stable id of the exon to retrieve
+        Arg [1]    : Session session - the ORM session object to connect to the DB to
+        Arg [2]    : str stable_id
+                     the stable id of the transcript to retrieve
         Example    : transcript = TranscriptAdaptor.fetch_by_stable_id('ENST00000309301');
                      transcript = TranscriptAdaptor.fetch_by_stable_id('ENST00000309301.2');
         Description: Retrieves a transcript via its stable id.
@@ -44,7 +45,8 @@ class TranscriptAdaptor():
         Returntype : ensembl.api.core.Transcript in native coordinates.
         Exceptions : NoResultFound
         Caller     : general
-        Status     : Alpha
+        Status     : At Risk
+                   : under development
         """
         if stable_id.find('.') > 0:
             (unversioned_stable_id, version) = stable_id.split('.')
@@ -76,9 +78,6 @@ class TranscriptAdaptor():
             .filter(TranscriptORM.is_current == '1')
             .first()
         )
-        
-        # res = (session.execute(stmt)
-        # .first())
 
         if not res:
                 raise NoResultFound(f'Could not find {unversioned_stable_id} as current stable_id')
@@ -93,13 +92,14 @@ class TranscriptAdaptor():
         )
         return TranscriptAdaptor._transcriptrow_to_transcript(session, res, transcript_attribs)
 
+
     @classmethod
     def fetch_by_stable_id_version(cls, session: Session, unversioned_stable_id: str, version: Union[str, int]) -> Transcript:
         """
         Arg [1]    : str stable_id
-            the stable id of the transcript to retrieve
+                     the stable id of the transcript to retrieve
         Arg [2]    : str/int version
-            The version of the stable_id to retrieve
+                     The version of the stable_id to retrieve
         Example    : transcript = TranscriptAdaptor.fetch_by_stable_id_version('ENST00000309301', 3);
         Description: Retrieves a transcript object from the database via its 
                      stable id and version.
@@ -116,8 +116,68 @@ class TranscriptAdaptor():
         int(version)
         return cls.fetch_by_stable_id(session, f"{unversioned_stable_id}.{version}")
 
+    
     @classmethod
-    def _transcriptrow_to_transcript(cls, session: Session, tr_row: Row, transcript_attribs: List[Row]) -> Transcript:
+    def fetch_all_by_gene_id(cls, session: Session, gene_internal_id: int) -> Transcript:
+        """
+        Arg [1]    : Session session - the ORM session object to connect to the DB to
+        Arg [2]    : int gene_internal_id
+                     the gene internal id of the transcripts to retrieve
+        Example    : transcript = TranscriptAdaptor.fetch_all_by_gene_id(1234);
+        Description: Retrieves a transcript list via the related gene internal_id.
+                     The transcripts will be retrieved in its native coordinate system (i.e.
+                     in the coordinate system it is stored in the database).
+                     If no transcript is found, an empty list is returned.
+        Returntype : list[ensembl.api.core.Transcript] in native coordinates.
+        Exceptions : none
+        Caller     : general
+        Status     : At Risk
+                   : under development
+        """
+        rows = (
+            session.query(
+                TranscriptORM,
+                Bundle("Biotype",
+                       Biotype.so_acc,
+                       Biotype.so_term
+                ),
+                Bundle("Xref",
+                       Xref.dbprimary_acc,
+                       Xref.description
+                ),
+                Bundle("Analysis",
+                       Analysis.logic_name
+                )
+            )
+            .join(TranscriptORM.display_xref)
+            .join(Biotype, and_(TranscriptORM.biotype == Biotype.name, Biotype.object_type == 'transcript'))
+            .join(TranscriptORM.analysis)
+            .filter(TranscriptORM.gene_id == gene_internal_id)
+            .filter(TranscriptORM.is_current == '1')
+            .all()
+        )
+
+        if not rows:
+            return []
+        
+        transcripts: list[Transcript] = []
+        for tr_row in rows:
+            transcript_attribs = (
+                session.query(TranscriptAttribORM, AttribTypeORM)
+                .join(TranscriptAttribORM.attribs)
+                .filter(TranscriptAttribORM.transcript_id == tr_row.Transcript.transcript_id)
+                .all()
+            )
+            tr = TranscriptAdaptor._transcriptrow_to_transcript(session, tr_row, transcript_attribs)
+            transcripts.append(tr)
+
+        return transcripts
+    
+
+    
+    
+    @classmethod
+    def _transcriptrow_to_transcript(cls, session: Session, tr_row: Row, transcript_attribs: list[Row]) -> Transcript:
         slice = SliceAdaptor.fetch_by_seq_region_id(session, tr_row.Transcript.seq_region_id)
         sr_len = tr_row.Transcript.seq_region_end - tr_row.Transcript.seq_region_start
         slice.location = Location(tr_row.Transcript.seq_region_start, tr_row.Transcript.seq_region_end, sr_len)
@@ -126,40 +186,20 @@ class TranscriptAdaptor():
         tr = Transcript(
             '.'.join((str(tr_row.Transcript.stable_id), str(tr_row.Transcript.version))),
             tr_row.Xref.dbprimary_acc,
-            slice
+            slice,
+            internal_id=tr_row.Transcript.transcript_id,
+            biotype=tr_row.Transcript.biotype,
+            source=tr_row.Transcript.source
         )
 
-        tr.add_metadata('source', ValueSetMetadata('transcript.source', tr_row.Transcript.source))
-        tr.add_metadata('biotype', ValueSetMetadata(f"{tr_row.Transcript.biotype.lower()}", tr_row.Biotype.so_term))
+        tr.add_metadata('biotype', tr_row.Biotype.so_term)
 
-        tr.add_metadata('description', ValueSetMetadata('coredb.description', tr_row.Transcript.description))
-        tr.add_metadata('analysis', ValueSetMetadata('coredb.analysis', tr_row.Analysis.logic_name))
-        tr.add_metadata('created_date', ValueSetMetadata('coredb.created_date', tr_row.Transcript.created_date))
-        tr.add_metadata('modified_date', ValueSetMetadata('coredb.modified_date', tr_row.Transcript.modified_date))
+        tr.add_metadata('description', tr_row.Transcript.description)
+        tr.add_metadata('analysis', tr_row.Analysis.logic_name)
+        tr.add_metadata('created_date', tr_row.Transcript.created_date)
+        tr.add_metadata('modified_date', tr_row.Transcript.modified_date)
 
         for ta in transcript_attribs:
-            if ta.AttribType.code.lower() == 'gencode_basic':
-                tr.add_metadata('gencode_basic', ValueSetMetadata('gencode_basic.true', 'true', f'{ta.TranscriptAttrib.value}'))
-                continue
-            if ta.AttribType.code.lower() == 'is_canonical':
-                tr.add_metadata('canonical', ValueSetMetadata('canonical_transcript.true', 'true', f'{ta.AttribType.name}'))
-                continue
-            if ta.AttribType.code.lower() == 'tsl':
-                tslv = TSLVERSION(ta.TranscriptAttrib.value[:5])
-                tr.add_metadata('tsl', ValueSetMetadata(f'tsl.{tslv.name}', tslv.value, f'{ta.TranscriptAttrib.value}'))
-                continue
-            if 'mane' in ta.AttribType.code.lower():
-                if ta.AttribType.code == 'MANE_Select':
-                    # ncbi_t['ncbi_transcript'] = {'id':f'{ta.TranscriptAttrib.value}', 'url':f"https://www.ncbi.nlm.nih.gov/nuccore/{ta.TranscriptAttrib.value}"}
-                    tr.add_metadata('mane.select', ValueSetMetadata('mane.select', f'{ta.TranscriptAttrib.value}', f'{ta.AttribType.name}'))
-                    # value: select, label: MANE Select, ncbi_transcript: {id:"NM_1234", url:"<URL>"}
-                    continue
-            if ta.AttribType.code.lower() == 'appris':
-                tr.add_metadata('appris', ValueSetMetadata('appris', f'{ta.TranscriptAttrib.value}', f'{ta.AttribType.name} {ta.TranscriptAttrib.value}'))
-                # value: alternative1, label: APPRIS alternative:1
-            if ta.AttribType.code.lower() == 'ccds_transcript':
-                tr.add_metadata('ccds', ValueSetMetadata('ccds_transcript.true', f'{ta.TranscriptAttrib.value}', f'{ta.TranscriptAttrib.value}'))
-                continue
-            # BUG - this below must be a list!!!
-            tr.add_metadata('transcript.attrib', ValueSetMetadata(ta.AttribType.code.lower(), f'{ta.TranscriptAttrib.value}', f'{ta.AttribType.name}'))
+            tr.add_attrib(ta.AttribType.code, ta.TranscriptAttrib.value)
+
         return tr

@@ -3,13 +3,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
 
 from ensembl.core.models import CoordSystem as CoordSystemORM
-from ensembl.core.models import SeqRegion as SeqRegionORM
 from ensembl.core.models import Meta as MetaORM
 
-from ensembl.api.core.Assembly import Assembly
+from ensembl.api.dbsql.CoordSystemAdaptor import CoordSystemAdaptor
 
+from ensembl.api.core.Assembly import Assembly, CoordSystem
 
-__all__ = ['AssemblyAdaptor']
+__all__ = [ 'AssemblyAdaptor' ]
 
 class AssemblyAdaptor():
 
@@ -25,21 +25,6 @@ class AssemblyAdaptor():
     )
 
     @classmethod
-    def fetch_by_seq_region_id(cls, session: Session, seq_region_id: int):
-        species_id = (session.query(CoordSystemORM.species_id)
-        .join(SeqRegionORM.coord_system)
-        .where(SeqRegionORM.seq_region_id == seq_region_id)
-        .first())
-        return cls.fetch_by_species_id(session, species_id[0])
-
-    @classmethod
-    def fetch_by_coord_system_name(cls, session: Session, cs_name: str):
-        species_id = (session.query(CoordSystemORM.species_id)
-        .where(and_(CoordSystemORM.coord_system_id == cs_name, CoordSystemORM.rank == 1))
-        .first())
-        return cls.fetch_by_species_id(session, species_id[0])
-
-    @classmethod
     def fetch_by_coord_system_id(cls, session: Session, coord_system_id: int) -> Assembly:
         species_id = (session.query(CoordSystemORM.species_id)
         .where(CoordSystemORM.coord_system_id == coord_system_id)
@@ -47,16 +32,33 @@ class AssemblyAdaptor():
         return cls.fetch_by_species_id(session, species_id[0])
 
     @classmethod
-    def fetch_by_species_production_name(cls, session: Session, species_production_name: str) -> Assembly:
-        species_id = (session.query(MetaORM.species_id)
-        .where(MetaORM.meta_key == 'species.production_name')
-        .first())
-        if not species_id:
-            raise NoResultFound(f"Could not find 'species.production_name' in meta table for species {species_production_name}")
-        return cls.fetch_by_species_id(session, species_id[0])
+    def fetch_by_coord_system_version(cls, session: Session, coord_system_version: str, species_id: int = 1) -> Assembly:
+        cs_row = (
+            session.query(CoordSystemORM.version, CoordSystemORM.attrib)
+            .distinct()
+            .where(and_(CoordSystemORM.version == coord_system_version,
+                        CoordSystemORM.species_id == species_id))
+            .first()
+        )
+        if not cs_row:
+            raise NoResultFound(f"Could not find coord system with version {coord_system_version}")
+        
+        if 'default' in cs_row.attrib:
+            return cls.fetch_by_species_id(session, species_id, unsafe=True)
+        
+        meta_row = (session.query(MetaORM)
+                    .where(MetaORM.species_id == species_id)
+                    .where(MetaORM.meta_key == 'species.production_name')
+                    .first()
+        )
+
+        return Assembly(cs_row.version,
+                        cs_row.version,
+                        meta_row.meta_value,
+                        is_default=False)
 
     @classmethod
-    def fetch_by_species_id(cls, session: Session, species_id: int) -> Assembly:
+    def fetch_by_species_id(cls, session: Session, species_id: int, unsafe: bool = False) -> Assembly:
         res = (session.query(MetaORM)
         .where(MetaORM.species_id == species_id)
         .filter(MetaORM.meta_key.in_(cls.__assembly_meta_keys))
@@ -76,11 +78,17 @@ class AssemblyAdaptor():
             assembly_provider_url,
             species_production_name
         ) = tuple( r.meta_value for r in res )
+
+        if not unsafe:
+            default_cs: CoordSystem = CoordSystemAdaptor.fetch_default_version(session)
+            if default_cs.name.lower() != assembly_default.lower():
+                raise Exception('Inconsistent default coord system configuration meta:{assembly_default} Vs coord_system:{default_cs.name}')
         
         return Assembly(assembly_name,
                         assembly_default,
+                        species_production_name,
                         assembly_accession,
                         assembly_provider_name,
-                        species_production_name,
                         last_geneset_update,
-                        assembly_date)
+                        assembly_date,
+                        is_default=True)

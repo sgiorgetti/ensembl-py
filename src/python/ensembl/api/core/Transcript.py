@@ -1,8 +1,6 @@
-from ensembl.api.core.Metadata import Metadata
 from ensembl.api.core.Exon import SplicedExon
 from ensembl.api.core.Slice import Slice
-from ensembl.api.core.Location import Location
-from typing import Dict, List, Any, Optional, Union
+from typing import Optional, Union
 
 __all__ = ['Transcript']
 
@@ -36,7 +34,9 @@ class Transcript(object):
                  stable_id: str,
                  symbol: str,
                  slice: Slice,
-                 relative_location: Location = None,
+                 internal_id: Union[str, int] = None,
+                 biotype: str = None,
+                 source: str = None
                 ) -> None:
         if not stable_id:
             raise ValueError()
@@ -49,11 +49,18 @@ class Transcript(object):
         (self._unversioned_stable_id, self._version) = stable_id.split('.')
         self._symbol = symbol
         self._slice = slice
-        self._relative_location = relative_location
         self._metadata = {}
+        self._attributes = {}
+        self._internal_id = internal_id
+        self._biotype = biotype
+        self._source = source
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.stable_id})'
+        if self._unversioned_stable_id:
+            if self._attributes.get('is_canonical'):
+                return f'{self.__class__.__name__}({self.stable_id} - canonical)'
+            return f'{self.__class__.__name__}({self.stable_id})'
+        return f'{self.__class__.__name__}(internal_id{self._internal_id})'
     
     @property
     def stable_id(self) -> str:
@@ -91,53 +98,87 @@ class Transcript(object):
     def version(self, value) -> None:
         self._version = value
 
-    def get_exons(self) -> List[SplicedExon]:
+    @property
+    def slice(self) -> Slice:
+        return self._slice
+    
+    @slice.setter
+    def slice(self, value: Slice) -> None:
+        self._slice = value
+
+    @property
+    def internal_id(self) -> int:
+        return self._internal_id
+    
+    @property
+    def dbID(self) -> int:
+        return self._internal_id
+    
+    @property
+    def biotype(self) -> str:
+        return self._biotype
+
+    @biotype.setter
+    def biotype(self, value: str) -> None:
+        self._biotype = value
+
+    @property
+    def source(self) -> str:
+        return self._source
+
+    @source.setter
+    def source(self, value: str) -> None:
+        self._source = value
+
+    def get_exons(self) -> list[SplicedExon]:
         return self._exons
     
-    def set_exons(self, exons: List[SplicedExon]) -> None:
+    def set_exons(self, exons: list[SplicedExon]) -> None:
         self._exons = exons
 
     def get_introns(self) -> tuple:
         return self._introns
     
-    def set_introns(self, introns: List[Any]) -> None:
+    def set_introns(self, introns: list) -> None:
         self._introns = introns
     
-    def get_metadata(self, md: Optional[str] = None) -> Union[Metadata, Dict[str, Metadata]]:
+    def get_metadata(self, md: Optional[str] = None) -> Union[dict, tuple]:
         if md is None:
             return self._metadata
-        return self._metadata.get(md)
+        return tuple(md, self._metadata.get(md))
     
-    def set_metadata(self, metadata_item: Dict[str, Metadata]) -> None:
-        self._metadata = metadata_item
-
-    def add_metadata(self, meta_key: str, meta_value: Metadata) -> None:
-        self._metadata[meta_key] = meta_value
-
-    def get_slice(self) -> Slice:
-        return self._slice
+    def add_metadata(self, code: str, value: str):
+        self._attributes[code] = value
     
-    def set_slice(self, slice: Slice) -> None:
-        self._slice = slice
+    def set_attribs(self, attribs: dict[str, str]) -> None:
+        self._attributes = attribs
 
-    def get_relative_location(self) -> Location:
-        return self._relative_location
+    def get_attribs(self, att_code: str = None) -> Union[dict, tuple]:
+        if att_code is None:
+            return self._attributes
+        return tuple(att_code, self._attributes.get(att_code))
     
-    def set_relative_location(self, relative_location: Location) -> None:
-        self._relative_location = relative_location
+    def add_attrib(self, code: str, value: str):
+        self._attributes[code] = value
 
     def is_canonical(self) -> bool:
-        if self.get_metadata('canonical'):
+        if self._attributes.get('is_canonical'):
             return True
         return False
     
     def is_mane_select(self) -> bool:
-        if self.get_metadata('mane.select'):
+        if self._attributes.get('MANE_Select'):
             return True
+        return False
+    
+    def is_mane(self) -> bool:
+        for att_code in self._attributes.keys().lower():
+            if 'mane' in att_code:
+                return True
         return False
 
 
-    def get_summary(self) -> Dict[str, str]:
+    def get_summary(self) -> dict[str, str]:
         """
         Example       : transcript_summary = transcript.get_summary()
         Description   : Retrieves a textual summary of this Feature.
@@ -153,22 +194,22 @@ class Transcript(object):
         summary['strand'] = self._slice.strand.value
         summary['seq_region_name'] = self._slice.region.name
 
-        summary['description'] = self._metadata.get('description').value
-        summary['biotype'] = self._metadata.get('biotype').accession_id
-        summary['source'] = self._metadata.get('source').value
+        summary['description'] = self._attributes.get('description').value
+        summary['biotype'] = self._biotype
+        summary['source'] = self._source
         summary['symbol'] = self._symbol
-        summary['logic_name'] = self._metadata.get('analysis').value
-        if self._metadata.get('ccds_transcript'):
-            summary['ccdsid'] = self._metadata.get('ccds_transcript').value
-        if self._metadata.get('tsl'):
-            summary['transcript_support_level'] = self._metadata.get('tsl').value
-        if self._metadata.get('gencode_basic'):
+        summary['logic_name'] = self._attributes.get('analysis').value
+        if self._attributes.get('ccds_transcript'):
+            summary['ccdsid'] = self._attributes.get('ccds_transcript').value
+        if self._attributes.get('tsl'):
+            summary['transcript_support_level'] = self._attributes.get('tsl').value
+        if self._attributes.get('gencode_basic'):
             summary['tag'] = 'basic'
 
         return summary
     
 # 1       havana  mRNA    65419   71585   .       +       .       ID=transcript:ENST00000641515;Parent=gene:ENSG00000186092;Name=OR4F5-201;biotype=protein_coding;tag=basic,Ensembl_canonical,MANE_Select;transcript_id=ENST00000641515;version=2
-    def gff3_qualifiers(self) -> Dict[str, Union[str, tuple[str]]]:
+    def gff3_qualifiers(self) -> dict[str, Union[str, tuple[str]]]:
 
         tags = ['basic']
         if self.is_canonical():
@@ -177,12 +218,12 @@ class Transcript(object):
             tags.append('MANE_Select')
         
         qualifiers = {
-            'source': self.get_metadata('source').value,
+            'source': self._source,
             'score': ".",
             'ID': f"{self.__type}:{self._unversioned_stable_id}",
             'Parent': "gene:ENSG00000186092",
             'Name': self._symbol,
-            'biotype': self._metadata.get('biotype').accession_id,
+            'biotype': self._biotype,
             'transcript_id': self._unversioned_stable_id,
             'version': self._version
         }

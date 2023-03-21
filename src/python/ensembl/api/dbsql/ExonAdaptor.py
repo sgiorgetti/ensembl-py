@@ -1,4 +1,4 @@
-__all__ = ['ExonAdaptor']
+__all__ = [ 'ExonAdaptor' ]
 
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session, Bundle
@@ -7,9 +7,9 @@ from sqlalchemy.engine.row import Row
 
 from ensembl.core.models import Exon as ExonORM, ExonTranscript as ExonTranscriptORM, Transcript as TranscriptORM
 
-from typing import Union, List
+from typing import Union
 
-from ensembl.api.core import Exon, SplicedExon, Slice, Location, Strand, ValueSetMetadata, Transcript
+from ensembl.api.core import Exon, SplicedExon, Slice, Location, Strand, Transcript
 from ensembl.api.dbsql.SliceAdaptor import SliceAdaptor
 
 class ExonAdaptor():
@@ -71,7 +71,7 @@ class ExonAdaptor():
         return ExonAdaptor._exonrow_to_exon(slice, res[0])
 
     @classmethod
-    def fetch_all_by_Transcript(cls, session: Session, transcript: Transcript) -> List[SplicedExon]:
+    def fetch_all_by_Transcript(cls, session: Session, transcript: Transcript) -> list[SplicedExon]:
         """
         Arg [1]    : sqlalchemy.orm.Session session
         Arg [2]    : ensembl.api.core.Transcript transcript
@@ -99,7 +99,7 @@ class ExonAdaptor():
                 .order_by(ExonTranscriptORM.rank)
                 .all()
         )
-        exons: List[SplicedExon] = []
+        exons: list[SplicedExon] = []
         for er in exon_rows:
             # exons.append(ExonAdaptor._exonrow_to_splicedexon(transcript.get_slice(), er))
             exons.append(ExonAdaptor._exonrow_to_splicedexon(transcript, er))
@@ -113,11 +113,17 @@ class ExonAdaptor():
         sr_len = row.seq_region_end - row.seq_region_start
         exon_slice.location = Location(row.seq_region_start, row.seq_region_end, sr_len)
         exon_slice.strand = Strand.REVERSE if row.seq_region_strand == -1 else Strand.FORWARD
-        e = Exon('.'.join((str(row.stable_id), str(row.version))), slice, row.phase, row.end_phase)
-        e.add_metadata('is_current', ValueSetMetadata('exon.is_current', row.is_current))
-        e.add_metadata('is_constitutive', ValueSetMetadata('exon.is_constitutive', row.is_constitutive))
-        e.add_metadata('created_date', ValueSetMetadata('exon.created_date', row.created_date))
-        e.add_metadata('modified_date', ValueSetMetadata('exon.modified_date', row.modified_date))
+        e = Exon(
+             '.'.join((str(row.stable_id), str(row.version))),
+             slice,
+             row.phase, 
+             row.end_phase,
+             row.exon_id,
+             row.is_constitutive
+            )
+        e.add_metadata('analysis', row.analysis_id)
+        e.add_metadata('created_date', row.created_date)
+        e.add_metadata('modified_date', row.modified_date)
         return e
     
     @classmethod
@@ -128,10 +134,18 @@ class ExonAdaptor():
         strand = Strand.REVERSE if row.Exon.seq_region_strand == -1 else Strand.FORWARD
         if slice.strand != strand:
             raise Exception("STRAND!!!!") 
-        e = SplicedExon('.'.join((str(row.Exon.stable_id), str(row.Exon.version))), slice, row.Exon.phase, row.Exon.end_phase, row.ExonTranscript.rank)
-        e.add_metadata('source', ValueSetMetadata('exon.source', transcript.get_metadata('source').value))
-        e.add_metadata('is_current', ValueSetMetadata('exon.is_current', row.Exon.is_current))
-        e.add_metadata('is_constitutive', ValueSetMetadata('exon.is_constitutive', row.Exon.is_constitutive))
-        e.add_metadata('created_date', ValueSetMetadata('exon.created_date', row.Exon.created_date))
-        e.add_metadata('modified_date', ValueSetMetadata('exon.modified_date', row.Exon.modified_date))
+        e = SplicedExon(
+             '.'.join((str(row.Exon.stable_id), str(row.Exon.version))),
+             slice,
+             row.Exon.phase,
+             row.Exon.end_phase,
+             row.ExonTranscript.rank,
+             "relative location",
+             row.exon_id,
+             row.is_constitutive
+            )
+        e.add_metadata('analysis', row.Exon.analysis_id)
+        e.add_metadata('source', transcript.source)
+        e.add_metadata('created_date', row.Exon.created_date)
+        e.add_metadata('modified_date', row.Exon.modified_date)
         return e

@@ -722,6 +722,7 @@ class GeneAttrib(Base):
         server_default=text("'0'"),
     )
     value = Column(Text, primary_key=True, nullable=False, index=True)
+    attribs = relationship("AttribType", primaryjoin="GeneAttrib.attrib_type_id == AttribType.attrib_type_id")
 
 
 #  t_gene_attrib = Table(

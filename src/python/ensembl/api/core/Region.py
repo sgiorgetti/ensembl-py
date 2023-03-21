@@ -1,7 +1,9 @@
 from ensembl.api.core.Metadata import Metadata
-from ensembl.api.core.Assembly import Assembly
+from ensembl.api.core.Assembly import CoordSystem
 from enum import Enum
-from typing import Dict, Union, Optional
+from typing import Union, Optional
+
+__all__ = [ 'Region', 'RegionCode', 'RegionTopology' ]
 
 class RegionCode(Enum):
     CHROMOSOME = 1
@@ -13,7 +15,7 @@ class RegionTopology(Enum):
     LINEAR = 1
     CIRCULAR = 2
 
-class Region(object):
+class Region():
     """Representation of a region.
     The Region data type describes the coordinate system that contains Features.
     In biological terms, it represents a naturally occurring or an artificially produced polynucleotide.
@@ -30,34 +32,28 @@ class Region(object):
     """
  
     def __init__(self, 
-                 name: str,
-                 code: Union[str, RegionCode],
-                 is_top_level: bool,
-                 rank: Optional[int],
+                 name: str, # e.g. '22'
                  topology: Union[str, RegionTopology],
                  length: int,
-                 assembly: Union[Assembly, str],
+                 coord_system: Union[CoordSystem, str],
                  fasta_file: Optional[str] = None
                 ) -> None:
         self.__name = name
-        self._code = code
-        self._is_top_level = is_top_level,
-        self._rank = rank,
         self._topology = topology if isinstance(topology, RegionTopology) else RegionTopology[topology.upper()]
         self._length = length
-        self._assembly = assembly
+        self._coord_system = coord_system
         self._fasta_file_url = fasta_file
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.name},{self._topology.name},{self._code})'
 
     @property
-    def assembly(self) -> Union[Assembly, str]:
-        return self._assembly
+    def coord_system(self) -> Union[CoordSystem, str]:
+        return self._coord_system
 
     @property
-    def code(self) -> RegionCode:
-        return self._code
+    def code(self) -> Union[RegionCode, str]:
+        return self._coord_system.name
     
     @property
     def name(self) -> str:
@@ -73,19 +69,19 @@ class Region(object):
     
     @property
     def is_top_level(self) -> bool:
-        return self._is_top_level
+        return self._coord_system.is_toplevel
     
     @property
     def rank(self) -> int:
-        return self._rank
+        return self._coord_system.rank
 
     @property
     def topology(self) -> RegionTopology:
         return self._topology
     
-    def get_metadata(self) -> Dict[str, Metadata]:
+    def get_metadata(self) -> dict[str, Metadata]:
         return self._metadata
     
-    def set_metadata(self, metadata_item: Dict[str, Metadata]) -> None:
+    def set_metadata(self, metadata_item: dict[str, Metadata]) -> None:
         self._metadata = metadata_item
 

@@ -1,7 +1,7 @@
 from ensembl.database.dbconnection import DBConnection
-from ensembl.api.dbsql import ExonAdaptor, SliceAdaptor, CoordSystemAdaptor, TranscriptAdaptor, AssemblyAdaptor
+from ensembl.api.dbsql import ExonAdaptor, SliceAdaptor, CoordSystemAdaptor, TranscriptAdaptor, AssemblyAdaptor, GeneAdaptor
 from ensembl.core.models import Exon as ExonORM
-from ensembl.api.core import Exon, SplicedExon, Transcript
+from ensembl.api.core import Exon, SplicedExon, Transcript, Gene
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -58,10 +58,30 @@ def main2():
     # dbc = DBConnection('mysql://mysql-ens-sta-1-b.ebi.ac.uk:4685/homo_sapiens_core_109_38')
     dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/homo_sapiens_core_110_38')
     # dbc = DBConnection('mysql://ensro@mysql-ens-sta-3.ebi.ac.uk:4160/protists_amoebozoa1_collection_core_57_110_1')
-    # with dbc.session_scope() as session:
-    aaa = SliceAdaptor.fetch_by_seq_region(dbc, '19','chromosome', None, 1, 1000, 1)
-    for a in aaa:
-        print(a)
+    with dbc.session_scope() as session:
+        sls = SliceAdaptor.fetch_by_seq_region(session, '13', 'chromosome', 'GRCh38', 32315086, 32400268, 1)
+        for sl in sls:
+            print(sl)
+            genes = GeneAdaptor.fetch_all_by_Slice(session, sl, load_transcripts=True)
+            for g in genes:
+                print(f"\t{g}")
+                for t in g.get_transcripts():
+                    print(f"\t\t{t}")
+
+def main3():
+    dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/homo_sapiens_core_110_38')
+    with dbc.session_scope() as session:
+        g = GeneAdaptor.fetch_by_stable_id(session, 'ENSG00000186092', True)
+        print(f'gene: {g.stable_id} - {g.internal_id}')
+        print(f"gene({g.internal_id}) has {len(g.get_transcripts())} transcripts")
+        for t in g.get_transcripts():
+            print(f"\ttranscript {t.stable_id} - isCanonical {t.is_canonical()}")
+
+def main4():
+    dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/homo_sapiens_core_110_38')
+    with dbc.session_scope() as session:
+        ss = SliceAdaptor._fetch_all_seq_regions_by_coord_system_id(session, 4)
+        print(ss)
 
 def main():
     # dbc = DBConnection('mysql://ensro@mysql-ens-core-prod-1.ebi.ac.uk:4524/sgiorgetti_homo_sapiens_core_109_38')
@@ -81,4 +101,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main2()
