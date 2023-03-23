@@ -9,7 +9,7 @@ Centralise generic code use across all other project within Ensembl, more partic
 Component etc.. 
  
 
-# Ensembl Python API (experimental/basic-genes branch)?
+# Ensembl Python API?
 
 This is a super-early, exploratory work for assessing the viablity of "porting" the Perl API into Python.
 A few words of warning are due, at this point. First and foremost, naive "porting" would make no sense:
@@ -20,7 +20,7 @@ A few words of warning are due, at this point. First and foremost, naive "portin
 
 ## Scope
 
-Scope is limited to the few core features, and related ancillary information, we have to deal with. Namely,
+Scope is limited to a few core features, and related ancillary information, we have to deal with. Namely,
 - Gene
 - Transcript
 - Exon
@@ -54,7 +54,7 @@ On the other hand, the `ensembl-genes-api` [ensembl-genes-api-url] repo contains
 
 To make things more complicated, neither of these approaches complies with the new [CDM] specs.
 
-### Current/latest try
+### experimental/basic-genes branch
 
 Decided to go for a familiar approach Object -- ObjectAdaptor(s), instead of something new, which would require a learning/acceptance curve. Let's start from - say - a gene in a GTF/GFF3/FASTA(/BED?) sort of context.
 I think I need:
@@ -70,12 +70,47 @@ I think I need:
 > Gene and Metadata concepts may be (are) affected
 > There are still inconsistencies - possibly minor ones - around RE types and constraints
 
-
-### Current "sprint" goal
+### Goals and results
 - Gene class compliant with `CDM`, `ensembl-genes-api`, and `ensembl` Gene concepts
 - Minimal Gene adaptor for MySQL, using SQL Alchemy's one from `ensembl-py`
 - Minimal Gene adaptor for GTF file, using something as close as possible to `ensembl-genes-api`'s
 - What's missing? Does this approach make sense?
+
+#### On the CDM
+Because of its design, the new `CDM` is very functional, end-user oriented: it tries to capture and present information ... provided the information are there.
+
+This is absolutely fine for the final data consumer (the web site), but it adds some un-needed complexity in the process of preparing data, during the Release lifecycle.
+
+#### On the flat files IO
+With reference to IO libraries available in Python, it looks like there are some quite adequate to use a (R)DBMS, but things are different when going to flat files (GFF, FASTA, ...).
+
+In truth there are a few approaches, but could not find many or well-supported.
+`gffutils` for instance looks nice, but it has some disadvantages like being based on `SQLite`, which needs to be created, maintained ..., and provides little or no features for dumping data out of the `SQLite` DB back into flat file format.
+
+#### What's missing? Does this approach make sense?
+Well, a lot is missing ... notably the sequences and related (basic) functionalities, as well as many slice/projection-related tools.
+
+The approach does not make a lot of sense:
+- use of `CDM` makes the data building phase cumbersome
+- use of a single `data model` for building/presenting data seems not working very well
+- some information are intrinsically related ... is the flat-file-only the only and right way to go? Isn't it a one-size-fits-all approach?
+
+### Current/latest try (experimental/genes-api)
+In this exercise, the target scenario is related to the `IDMapping` re-implementation, which comprises
+- Re-write the Perl scripts/pipeline with Python
+- Avoid RDBMS core DBs, as much as possible
+- Replace `exonerate` with `minimap2` directly or via `Liftoff`
+
+
+### Current "sprint" goals
+- Basic feature classes compatible with `ensembl-genes-api` and `ensembl`  concepts
+- Minimal feature adaptors for MySQL, using SQL Alchemy's one from `ensembl-py`
+- Minimal feature adaptors for GFF/GTF file, using something as close as possible to `ensembl-genes-api`'s
+- Building the ID Mapping Cache file
+
+
+
+
 
 [//]: # (List of references used before)
 
