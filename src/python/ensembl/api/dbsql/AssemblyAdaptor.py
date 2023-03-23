@@ -1,3 +1,17 @@
+# See the NOTICE file distributed with this work for additional information
+# regarding copyright ownership.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
@@ -7,7 +21,7 @@ from ensembl.core.models import Meta as MetaORM
 
 from ensembl.api.dbsql.CoordSystemAdaptor import CoordSystemAdaptor
 
-from ensembl.api.core.Assembly import Assembly, CoordSystem
+from ensembl.api.core.Assembly import Assembly
 
 __all__ = [ 'AssemblyAdaptor' ]
 
@@ -80,8 +94,8 @@ class AssemblyAdaptor():
         ) = tuple( r.meta_value for r in res )
 
         if not unsafe:
-            default_cs: CoordSystem = CoordSystemAdaptor.fetch_default_version(session)
-            if default_cs.name.lower() != assembly_default.lower():
+            default_cs: str = CoordSystemAdaptor.fetch_default_version(session)
+            if default_cs.lower() != assembly_default.lower():
                 raise Exception('Inconsistent default coord system configuration meta:{assembly_default} Vs coord_system:{default_cs.name}')
         
         return Assembly(assembly_name,

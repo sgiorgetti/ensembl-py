@@ -54,8 +54,10 @@
 
 from .TinyFeature import TinyFeature
 from .TinyTranscript import TinyTranscript
+from ensembl.api.core.Transcript import Transcript
 from typing import Union
 import warnings
+import hashlib
 
 __all__ = [ 'TinyGene' ]
 
@@ -76,7 +78,7 @@ class TinyGene(TinyFeature):
                  strand: int,
                  seq_region_name: str = None,
                  biotype: str = None,
-                 transcripts: list(TinyTranscript) = None) -> None:
+                 transcripts: list[TinyTranscript] = None) -> None:
         super().__init__(internal_id, stable_id, version, created_date, modified_date)
         self._start = start
         self._end = end
@@ -214,7 +216,7 @@ class TinyGene(TinyFeature):
         self._seq_region_name = seq_region_name
 
     @property
-    def transcripts(self) -> list(TinyTranscript):
+    def transcripts(self) -> list[TinyTranscript]:
         """
         Example     : for tr in tiny_gene.transcripts:
                         # do something with transcript
@@ -242,13 +244,49 @@ class TinyGene(TinyFeature):
         """
         if not transcripts:
             warnings.warn(f"Provided transcript list is empty or None", UserWarning)
-            return
+            return None
         if isinstance(transcripts, TinyTranscript):
             self._transcripts.append(transcripts)
+            return None
         if isinstance(transcripts[0], TinyTranscript):
             self._transcripts.extend(transcripts)
+        return None
+    
+    def add_fat_transcripts(self, fat_transcripts: list[Transcript]) -> None:
+        """
+        Arg[1]      : ensembl.api.core.Transcript fat_transcripts - the transcript list to add
+        Example     : tiny_transcript.add_transcript(fat_transcripts)
+        Description : Adds transcript list to this gene.
+        Return type : none
+        Exceptions  : none
+        Caller      : general
+        Status      : At Risk
+                    : under development
+        """
+        if not fat_transcripts:
+            warnings.warn(f"Provided transcript list is empty or None", UserWarning)
+            return
+        if not isinstance(fat_transcripts[0], Transcript):
+            warnings.warn(f"Provided list is not made of Transcript objects", UserWarning)
+            return
+        
+        ltrs = [ TinyTranscript(tr.internal_id,
+                                tr.unversioned_stable_id,
+                                tr.version,
+                                tr.get_metadata('created_date'),
+                                tr.get_metadata('modified_date'),
+                                tr.slice.location.start,
+                                tr.slice.location.end,
+                                tr.slice.strand.value,
+                                tr.slice.location.length,
+                                seq_digest=hashlib.md5(tr.spliced_seq.encode('utf-8')).hexdigest(),
+                                biotype=tr.biotype,
+                                seq_region_name=tr.slice.name
+                                ) for tr in fat_transcripts ]
+        self._transcripts = ltrs
+        
 
-    def get_all_transcripts(self) -> list(TinyTranscript):
+    def get_all_transcripts(self) -> list[TinyTranscript]:
         """
         Example     : for tr in tiny_gene.get_all_transcripts():
                         # do something with transcript
@@ -260,7 +298,7 @@ class TinyGene(TinyFeature):
         Status      : At Risk
                     : under development
         """
-        self.transcripts
+        return self._transcripts
 
     def _build_gene(self):
         # Check the integrity of the exons

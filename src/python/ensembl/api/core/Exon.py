@@ -1,10 +1,25 @@
-from ensembl.api.core.Slice import Slice
-from ensembl.api.core.Location import Location
-from typing import Optional, Union
+# See the NOTICE file distributed with this work for additional information
+# regarding copyright ownership.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from .Slice import Slice
+from .Strand import Strand
+from .Feature import Feature
+from typing import Union
 
 __all__ = [ 'Exon', 'SplicedExon' ]
 
-class Exon(object):
+class Exon(Feature):
     """Representation of an exon.
     The location of an exon is always provided 5' -> 3' on the forward strand.
     Thus the start should always be lower than the end.
@@ -28,49 +43,65 @@ class Exon(object):
  
     def __init__(self,
                  stable_id: str,
-                 slice: Slice,
+                 version: int,
                  phase: int,
                  end_phase: int,
-                 internal_id: int = None,
-                 is_constitutive: bool = False
+                 internal_id: Union[str, int] = None,
+                 slice: Slice = None,
+                 start: int = None,
+                 end: int = None,
+                 strand: Strand = None,
+                 analysis: str = None,
+                 is_constitutive: bool = False,
+                 is_current: bool = True,
+                 created_date = None,
+                 modified_date = None
                 ) -> None:
         if not stable_id:
             raise ValueError()
         if not Slice:
             raise ValueError()
-        if stable_id.find('.') < 0:
+        if stable_id.find('.') > 0:
             raise ValueError()
-        (self._unversioned_stable_id, self._version) = stable_id.split('.')
+        if not isinstance(phase, int):
+            raise ValueError('phase argument must be int')
+        if phase not in (-1, 0, 1, 2):
+            raise ValueError(f'Bad value {phase} for exon phase: it must be any of (-1, 0, 1, 2)')
+        if end_phase is None:
+            raise ValueError(f"No end phase set in Exon. You must set it explicitly.")
+        self._stable_id = stable_id
+        self._version = version
         self._slice = slice
         self._phase = phase
         self._end_phase = end_phase
-        self._metadata = {}
         self._is_constitutive = is_constitutive
+        self._is_current = is_current
         self._internal_id = internal_id
+
+        super().__init__(start, end, strand, slice, analysis, internal_id, created_date, modified_date)
     # (1, 1, 76835377, 76835502, -1, -1, -1, 1, 0, 'ENSE00002089356', 1, datetime.datetime(2022, 7, 5, 10, 44, 45), datetime.datetime(2022, 7, 5, 10, 44, 45))
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.stable_id})'
     
     @property
+    def stable_id_version(self) -> str:
+        return f"{self._stable_id}.{self._version}"
+    
+    @property
     def stable_id(self) -> str:
-        return f"{self._unversioned_stable_id}.{self._version}"
+        return self._stable_id
 
     @stable_id.setter
     def stable_id(self, value: str) -> None:
-        (self._unversioned_stable_id, self._version) = value.split('.')
+        if value.find('.') > 0:
+            (self._stable_id, self._version) = value.split('.')
+        else:
+            self._stable_id = value
     
     @property
     def type(self) -> str:
         return self.__type
-
-    @property
-    def unversioned_stable_id(self) -> str:
-        return self._unversioned_stable_id
-
-    @unversioned_stable_id.setter
-    def unversioned_stable_id(self, value) -> None:
-        self._unversioned_stable_id = value
 
     @property
     def version(self):
@@ -115,25 +146,6 @@ class Exon(object):
     def internal_id(self):
         return self._internal_id
     
-    def get_analysis(self):
-        return self.get_metadata('analysis')
-    
-    def set_analysis(self, analysis) -> None:
-        self.add_metadata('analysis', analysis)
-    
-    def get_metadata(self, md: Optional[str] = None) -> Union[dict, tuple]:
-        if md is None:
-            return self._metadata
-        return tuple(md, self._metadata.get(md))
-
-    def add_metadata(self, meta_key: str, meta_value) -> None:
-        self._metadata[meta_key] = meta_value
-
-    def get_slice(self) -> Slice:
-        return self._slice
-    
-    def set_slice(self, slice: Slice) -> None:
-        self._slice = slice
 
 
     def get_summary(self) -> dict[str, str]:
@@ -143,14 +155,14 @@ class Exon(object):
         Returns       : Dict[str, str]
         Status        : Alpha - Intended for internal use
         """
-        summary = {}
-        summary['id'] = self.unversioned_stable_id
-        summary['exon_id'] = self.unversioned_stable_id
+        summary = super().get_summary()
+        summary['id'] = self._stable_id
+        summary['exon_id'] = self._stable_id
         summary['version'] = self.version if self.version else ''
-        summary['start'] = self._slice.location.start
-        summary['end'] = self._slice.location.end
-        summary['strand'] = self._slice.strand.value
-        summary['seq_region_name'] = self._slice.region.name
+        summary['start'] = self.start
+        summary['end'] = self.end
+        summary['strand'] = self.strand.value
+        summary['seq_region_name'] = self.seqname
         summary['constitutive'] = str(self._is_constitutive)
         summary['ensembl_phase'] = self._phase
         summary['ensembl_end_phase'] = self._end_phase
@@ -160,34 +172,53 @@ class Exon(object):
 class SplicedExon(Exon):
     def __init__(self,
                  stable_id: str,
-                 slice: Slice,
+                 version: int,
                  phase: int,
                  end_phase: int,
                  index: int,
-                 relative_location: Location = None,
-                 internal_id: int = None,
-                 is_constitutive: bool = False
+                 internal_id: Union[str, int] = None,
+                 slice: Slice = None,
+                 start: int = None,
+                 end: int = None,
+                 strand: Strand = None,
+                 analysis: str = None,
+                 is_constitutive: bool = False,
+                 is_current: bool = True,
+                 transcript_source = None,
+                 created_date = None,
+                 modified_date = None
                 ) -> None:
-        Exon.__init__(self,
-                       stable_id,
-                       slice,
+        
+        self._index = index
+        self._transcript_source = transcript_source
+        super().__init__(stable_id,
+                       version,
                        phase,
                        end_phase,
                        internal_id,
-                       is_constitutive
-        )
-        self._index = index
-        self._relative_location = relative_location
+                       slice,
+                       start,
+                       end,
+                       strand,
+                       analysis,
+                       is_constitutive,
+                       is_current,
+                       created_date,
+                       modified_date
+                       )
+        
     
     @property
     def index(self) -> int:
         return self._index
     
-    def get_relative_location(self) -> Location:
-        return self._relative_location
+    @property
+    def source(self) -> str:
+        return self._transcript_source
     
-    def set_relative_location(self, relative_location: Location) -> None:
-        self._relative_location = relative_location
+    @property
+    def transcript_source(self) -> str:
+        return self._transcript_source
 
     def get_summary(self) -> dict[str, str]:
         """
@@ -203,13 +234,13 @@ class SplicedExon(Exon):
     # 1       havana  exon    65419   65433   .       +       .       Parent=transcript:ENST00000641515;Name=ENSE00003812156;constitutive=1;ensembl_end_phase=-1;ensembl_phase=-1;exon_id=ENSE00003812156;rank=1;version=1
     def gff3_qualifiers(self) -> dict[str, Union[str, tuple[str]]]:
         qualifiers = {
-            'source': self.get_metadata('source').value,
+            'source': self.source,
             'score': ".",
-            'Name': self._unversioned_stable_id,
+            'Name': self._stable_id,
             'constitutive': str(self._is_constitutive),
             'ensembl_phase': self._phase,
             'ensembl_end_phase': self._end_phase,
-            'exon_id': self._unversioned_stable_id,
+            'exon_id': self._stable_id,
             'rank': self._index,
             'version': self.version
         }

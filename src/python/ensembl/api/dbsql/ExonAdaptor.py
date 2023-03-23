@@ -1,4 +1,16 @@
-__all__ = [ 'ExonAdaptor' ]
+# See the NOTICE file distributed with this work for additional information
+# regarding copyright ownership.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session, Bundle
@@ -9,8 +21,10 @@ from ensembl.core.models import Exon as ExonORM, ExonTranscript as ExonTranscrip
 
 from typing import Union
 
-from ensembl.api.core import Exon, SplicedExon, Slice, Location, Strand, Transcript
+from ensembl.api.core import Exon, SplicedExon, Slice, Strand, Transcript
 from ensembl.api.dbsql.SliceAdaptor import SliceAdaptor
+
+__all__ = [ 'ExonAdaptor' ]
 
 class ExonAdaptor():
     """Contains all the exon related functions over Exon ORM
@@ -68,7 +82,7 @@ class ExonAdaptor():
         if not res:
                 raise NoResultFound(f'Could not find {unversioned_stable_id} v.{version} as current stable_id')
         slice = SliceAdaptor.fetch_by_seq_region_id(session, res[0].seq_region_id)
-        return ExonAdaptor._exonrow_to_exon(slice, res[0])
+        return cls._exonrow_to_exon(slice, res[0])
 
     @classmethod
     def fetch_all_by_Transcript(cls, session: Session, transcript: Transcript) -> list[SplicedExon]:
@@ -85,11 +99,12 @@ class ExonAdaptor():
         if not transcript:
             raise ValueError("Transcript must be specified!")
         
-        tr_stable_id = transcript.unversioned_stable_id
+        tr_stable_id = transcript.stable_id
         exon_rows = (
              session.query(Bundle("Transcript",
                             TranscriptORM.stable_id,
-                            TranscriptORM.is_current
+                            TranscriptORM.is_current,
+                            TranscriptORM.source
                            ),
                            Bundle("ExonTranscript", ExonTranscriptORM.rank),
                            ExonORM)
@@ -101,51 +116,50 @@ class ExonAdaptor():
         )
         exons: list[SplicedExon] = []
         for er in exon_rows:
-            # exons.append(ExonAdaptor._exonrow_to_splicedexon(transcript.get_slice(), er))
-            exons.append(ExonAdaptor._exonrow_to_splicedexon(transcript, er))
-        # transcript.set_exons(exons)
+            exons.append(cls._exonrow_to_splicedexon(transcript._slice, er))
         return exons
             
 
 
     @classmethod
     def _exonrow_to_exon(cls, exon_slice: Slice, row: Row) -> Exon:
-        sr_len = row.seq_region_end - row.seq_region_start
-        exon_slice.location = Location(row.seq_region_start, row.seq_region_end, sr_len)
-        exon_slice.strand = Strand.REVERSE if row.seq_region_strand == -1 else Strand.FORWARD
         e = Exon(
-             '.'.join((str(row.stable_id), str(row.version))),
-             slice,
-             row.phase, 
-             row.end_phase,
-             row.exon_id,
-             row.is_constitutive
+             row.Exon.stable_id,
+             row.Exon.version,
+             row.Exon.phase,
+             row.Exon.end_phase,
+             row.Exon.exon_id,
+             exon_slice,
+             row.Exon.start,
+             row.Exon.end,
+             Strand(row.Exon.strand),
+             None,
+             row.is_constitutive,
+             row.Exon.is_current,
+             created_date=row.Exon.created_date,
+             modified_date=row.Exon.modified_date
             )
-        e.add_metadata('analysis', row.analysis_id)
-        e.add_metadata('created_date', row.created_date)
-        e.add_metadata('modified_date', row.modified_date)
         return e
     
     @classmethod
-    def _exonrow_to_splicedexon(cls, transcript: Transcript, row: Row) -> SplicedExon:
-        slice = Slice(region=transcript.get_slice().region, strand=transcript.get_slice().strand)
-        sr_len = row.Exon.seq_region_end - row.Exon.seq_region_start
-        slice.location = Location(row.Exon.seq_region_start, row.Exon.seq_region_end, sr_len)
-        strand = Strand.REVERSE if row.Exon.seq_region_strand == -1 else Strand.FORWARD
-        if slice.strand != strand:
-            raise Exception("STRAND!!!!") 
+    def _exonrow_to_splicedexon(cls, tr_slice: Slice, row: Row) -> SplicedExon:
         e = SplicedExon(
-             '.'.join((str(row.Exon.stable_id), str(row.Exon.version))),
-             slice,
+             row.Exon.stable_id,
+             row.Exon.version,
              row.Exon.phase,
              row.Exon.end_phase,
              row.ExonTranscript.rank,
-             "relative location",
-             row.exon_id,
-             row.is_constitutive
+             row.Exon.exon_id,
+             tr_slice,
+             row.Exon.seq_region_start,
+             row.Exon.seq_region_end,
+             Strand(row.Exon.seq_region_strand),
+             None,
+             row.Exon.is_constitutive,
+             row.Exon.is_current,
+             row.Transcript.source,
+             created_date=row.Exon.created_date,
+             modified_date=row.Exon.modified_date
             )
-        e.add_metadata('analysis', row.Exon.analysis_id)
-        e.add_metadata('source', transcript.source)
-        e.add_metadata('created_date', row.Exon.created_date)
-        e.add_metadata('modified_date', row.Exon.modified_date)
+
         return e

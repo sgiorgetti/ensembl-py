@@ -2,13 +2,13 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import Session, Bundle
 
 from ensembl.core.models import SeqRegion as SeqRegionORM, CoordSystem as CoordSystemORM, AttribType as AttribTypeORM
-from ensembl.core.models import SeqRegionAttrib as SeqRegionAttribORM
+from ensembl.core.models import SeqRegionAttrib as SeqRegionAttribORM, AssemblyException as AssemblyExceptionORM
 
 from typing import Optional
 
 from ensembl.api.dbsql.Exceptions import ArgumentError
 from ensembl.api.dbsql.CoordSystemAdaptor import CoordSystemAdaptor
-from ensembl.api.core import Location, Strand, Slice, Region, RegionTopology, CoordSystem
+from ensembl.api.core import Strand, Slice, RegionTopology
 import warnings
 
 __all__ = [ 'SliceAdaptor' ]
@@ -16,13 +16,14 @@ __all__ = [ 'SliceAdaptor' ]
 class SliceAdaptor():
     """Contains all the slice related functions over Slice ORM
     """
+    _asm_exc_cache: tuple = ()
     
     @classmethod
     def fetch_by_seq_region(cls,
                             session: Session,
                             seq_region_name: str,
-                            coord_system: str, # this is the Region.code in CDM
-                            version: Optional[str] = None, # this is Assembly.name in CDM
+                            coord_system_name: str,
+                            version: Optional[str] = None, # this is Assembly name
                             start: int = 1,
                             end: Optional[int] = None,
                             strand: int = 1
@@ -32,7 +33,7 @@ class SliceAdaptor():
             the session to connect to a core DB
         Arg [2]    : str seq_region_name
             the seq_region name as specified in the core DB
-        Arg [3]    : str coord_system
+        Arg [3]    : str coord_system_name
             the coordinate system name of the seq_region to retrieve
         Arg [4]    : str version
             the coordinate system version as specified in the core DB - e.g. GRCh38
@@ -43,11 +44,11 @@ class SliceAdaptor():
         Arg [7]    : int strand
             the seq_region strand +1 forward, -1 reverse
 
-        Example    : region = region_adaptor.fetch_by_region( session, 'chromosome', 'X' );
+        Example    : region = region_adaptor.fetch_by_region( session, 'X', 'chromosome' );
         Description: Retrieves a slice on the requested region.  At a minimum the
                      name the name of the seq_region to fetch, alomg with the coordinate
                      system name, must be provided.
-        Returntype : List[ensembl.api.core.Slice]
+        Returntype : list[ensembl.api.core.Slice]
         Exceptions : throw if no or wrong argument is provided
         Caller     : general
         Status     : At Risk
@@ -57,16 +58,15 @@ class SliceAdaptor():
             raise ArgumentError()
         
         slices = []
-        if start is None:
+        if not start:
             start = 1
-        if not isinstance(start, int):
-            raise ArgumentError('start argument must be an int')
-        if end and not isinstance(end, int):
-            raise ArgumentError('start argument must be an int or None')
+        start = int(start)
+        if end:
+            end = int(end)
         if not seq_region_name:
             raise ArgumentError('seq_region_name argument is required')
-        if not coord_system:
-            raise ArgumentError('coord_system argument is required')
+        if not coord_system_name:
+            raise ArgumentError('coord_system_name argument is required')
         
         stmt = (select(
                 Bundle("SeqRegion",
@@ -76,7 +76,7 @@ class SliceAdaptor():
                         SeqRegionORM.coord_system_id
                 ))
         .join(SeqRegionORM.coord_system)
-        .where(and_(CoordSystemORM.name == coord_system, SeqRegionORM.name == seq_region_name))
+        .where(and_(CoordSystemORM.name == coord_system_name, SeqRegionORM.name == seq_region_name))
         )
         if version:
             stmt = stmt.filter(CoordSystemORM.version == version)
@@ -84,26 +84,32 @@ class SliceAdaptor():
         rows = session.execute(stmt).all()
         
         for row in rows:
-            topology = 'CIRCULAR' if cls._is_circular(session, row.SeqRegion.seq_region_id) else 'LINEAR'
             cs = CoordSystemAdaptor.fetch_by_dbID(session, row.SeqRegion.coord_system_id)
-            region = Region(row.SeqRegion.sr_name,
-                            topology=topology,
-                            length=row.SeqRegion.length,
-                            coord_system=cs)
-            end = end if end else row.SeqRegion.length
-            location = Location(start, end, row.SeqRegion.length)
-            st = Strand(strand)
-            slices.append(Slice(region, location, st))
+            strand = Strand(strand) if strand else Strand.UNDEFINED
+            s = Slice(
+                cs,
+                row.SeqRegion.sr_name,
+                row.SeqRegion.length,
+                start,
+                end if end else row.SeqRegion.length,
+                strand,
+                internal_id=row.SeqRegion.seq_region_id,
+                topology = RegionTopology.CIRCULAR if cls._is_circular(session, row.SeqRegion.seq_region_id) else RegionTopology.LINEAR
+            )   
+            slices.append(s)
             
         if len(slices) == 0:
-            warnings.warn(f'Could not find any region with name {seq_region_name} and coordinate {coord_system}', UserWarning)
+            warnings.warn(f'Could not find any region with name {seq_region_name} and coordinate {coord_system_name}', UserWarning)
 
         return slices
     
     @classmethod
     def fetch_by_seq_region_id(cls, 
                                session: Session,
-                               seq_region_id: int
+                               seq_region_id: int,
+                               start: int = 1,
+                               end: int = None,
+                               strand: Strand = Strand.FORWARD
                                ) -> Slice:
         if not session:
             raise ArgumentError()
@@ -134,13 +140,17 @@ class SliceAdaptor():
 
         topology = 'CIRCULAR' if cls._is_circular(session, result.SeqRegion.seq_region_id) else 'LINEAR'
         cs = CoordSystemAdaptor.fetch_by_dbID(session, result.CoordSystem.coord_system_id)
-        region = Region(result.SeqRegion.name,
-                        topology=topology,
-                        length=result.SeqRegion.length,
-                        coord_system=cs)
-        # location = Location(start, end, row.sr_length)
-        # st = Strand.REVERSE if strand == -1 else Strand.FORWARD
-        return Slice(region=region)
+        return Slice(
+            cs,
+            result.SeqRegion.name,
+            result.SeqRegion.length,
+            start,
+            end if end else result.SeqRegion.length,
+            strand,
+            internal_id=result.SeqRegion.seq_region_id,
+            topology = RegionTopology.CIRCULAR if cls._is_circular(session, result.SeqRegion.seq_region_id) else RegionTopology.LINEAR
+        )  
+
         
     @classmethod
     def fetch_by_name(cls,
@@ -181,7 +191,7 @@ class SliceAdaptor():
 
         return cls.fetch_by_seq_region(session,
                                        seq_region_name=array[2],
-                                       coord_system=array[0],
+                                       coord_system_name=array[0],
                                        version=array[1],
                                        start=array[3],
                                        end=array[4],
@@ -256,6 +266,7 @@ class SliceAdaptor():
         else:
             seq_regs = cls._fetch_all_seq_regions_by_coord_system_id(session, orig_cs.internal_id)
 
+        out_slices = []
         for (seq_region_id, name, length, cs_id) in seq_regs:
             if seq_region_id in bad_vals.keys():
                 continue
@@ -265,13 +276,31 @@ class SliceAdaptor():
 
             # insert here cache mgmt - cache values for future reference
 
-            loc = Location(1, length, length)
+
             tpl = RegionTopology.CIRCULAR if cls._is_circular(session, seq_region_id) else RegionTopology.LINEAR
-            reg = Region(name,
-                        topology=tpl,
-                        length=length,
-                        coord_system=cs)
-            slice = Slice(reg, loc, None)
+            slice = Slice(
+                cs,
+                name,
+                length,
+                1,
+                length,
+                topology = tpl
+            )  
+
+            if not include_duplicates:
+                if not cls._asm_exc_cache:
+                    cls._build_exception_cache(session, cs.species_id)
+                    if len(cls._asm_exc_cache) > 0:
+                        raise Exception('Cannot handle assembly exceptions. Sorry!')
+                # projection = fetch_normalized_slice_projection($slice)}
+                # for segment in projection:
+                #     out_slices.append() if segment[2] == slice else continue
+                raise NotImplemented()
+            else:
+                out_slices.append(slice)
+
+        return out_slices 
+
     
 
     @classmethod
@@ -292,7 +321,7 @@ class SliceAdaptor():
             )
             )
         )
-        return tuple(session.scalars(stmt).all())
+        return tuple(session.execute(stmt).all())
     
 
     @classmethod
@@ -306,7 +335,7 @@ class SliceAdaptor():
             )
             .where(SeqRegionORM.coord_system_id == coord_system_id)
         )
-        return tuple(session.scalars(stmt).all())
+        return tuple(session.execute(stmt).all())
 
 
     @classmethod
@@ -357,4 +386,21 @@ class SliceAdaptor():
         if res:
             return res
         return ""
+    
+    @classmethod
+    def _build_exception_cache(cls, session, species_id: int) -> None:
+        # build up a cache of the entire assembly exception table
+        # it should be small anyway
+        res = (
+            session.query(AssemblyExceptionORM)
+            .join(SeqRegionORM, SeqRegionORM.seq_region_id == AssemblyExceptionORM.seq_region_id)
+            .join(CoordSystemORM, CoordSystemORM.coord_system_id == SeqRegionORM.coord_system_id)
+            .where(CoordSystemORM.species_id == species_id)
+            .all()
+        )
+        myasm = []
+        for r in res:
+            myasm.append(r)
+        cls._asm_exc_cache = tuple(myasm)
+
     

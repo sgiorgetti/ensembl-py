@@ -1,8 +1,6 @@
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import Session
 
-from ensembl.database.dbconnection import DBConnection
-
 from ensembl.core.models import CoordSystem as CoordSystemORM, Meta as MetaORM
 
 from typing import Optional
@@ -67,8 +65,13 @@ class CoordSystemAdaptor():
         cs_list = []
         for row in rows:
             toplevel = True if row.name == 'top_level' else False
-            seqlevel = True if 'sequence_level' in row.attrib else False
-            default = True if 'default' in row.attrib else False
+            seqlevel = False
+            default = False
+            if row.attrib:
+                if 'sequence_level' in row.attrib:
+                    seqlevel = True
+                if 'default' in row.attrib:
+                    default = True
 
             cs = CoordSystem(row.name, row.version, row.rank, toplevel, seqlevel, default, row.species_id, row.coord_system_id)
             cs_list.append(cs)
@@ -113,8 +116,13 @@ class CoordSystemAdaptor():
 
         for row in rows:
             toplevel = True if row.name == 'top_level' else False
-            seqlevel = True if 'sequence_level' in row.attrib else False
-            default = True if 'default' in row.attrib else False
+            seqlevel = False
+            default = False
+            if row.attrib:
+                if 'sequence_level' in row.attrib:
+                    seqlevel = True
+                if 'default' in row.attrib:
+                    default = True
 
             cs = CoordSystem(row.name, row.version, row.rank, toplevel, seqlevel, default, row.species_id, row.coord_system_id)
             cs_list.append(cs)
@@ -187,15 +195,20 @@ class CoordSystemAdaptor():
             )
             warn_str += f" and version {version}"
 
-        cs_row = session.execute(stmt).first()
+        cs_row = session.scalars(stmt).first()
 
         if not cs_row:
             warnings.warn(warn_str, UserWarning)
             return None
         
         toplevel = True if cs_row.name == 'top_level' else False
-        seqlevel = True if 'sequence_level' in cs_row.attrib else False
-        default = True if 'default' in cs_row.attrib else False
+        seqlevel = False
+        default = False
+        if cs_row.attrib:
+            if 'sequence_level' in cs_row.attrib:
+                seqlevel = True
+            if 'default' in cs_row.attrib:
+                default = True
 
         return CoordSystem(cs_row.name, cs_row.version, cs_row.rank, toplevel, seqlevel, default, cs_row.species_id, cs_row.coord_system_id)
 
@@ -228,8 +241,13 @@ class CoordSystemAdaptor():
             raise Exception(f'Multiple sequence_level coord_systems are defined. Only one is currently supported')
     
         toplevel = True if rows[0].name == 'top_level' else False
-        seqlevel = True if 'sequence_level' in rows[0].attrib else False
-        default = True if 'default' in rows[0].attrib else False
+        seqlevel = False
+        default = False
+        if rows[0].attrib:
+            if 'sequence_level' in rows[0].attrib:
+                seqlevel = True
+            if 'default' in rows[0].attrib:
+                default = True
 
         return CoordSystem(rows[0].name, rows[0].version, rows[0].rank, toplevel, seqlevel, default, rows[0].species_id, rows[0].coord_system_id)
         
@@ -256,8 +274,13 @@ class CoordSystemAdaptor():
             return None
     
         toplevel = True if cs_row.name == 'top_level' else False
-        seqlevel = True if 'sequence_level' in cs_row.attrib else False
-        default = True if 'default' in cs_row.attrib else False
+        seqlevel = False
+        default = False
+        if cs_row.attrib:
+            if 'sequence_level' in cs_row.attrib:
+                seqlevel = True
+            if 'default' in cs_row.attrib:
+                default = True
 
         return CoordSystem(cs_row.name, cs_row.version, cs_row.rank, toplevel, seqlevel, default, cs_row.species_id, cs_row.coord_system_id)
 
@@ -335,7 +358,7 @@ class CoordSystemAdaptor():
         cs_list = []
         for cs_row in rows:
             toplevel = False
-            seqlevel = True if 'sequence_level' in cs_row.attrib else False
+            seqlevel = True if cs_row.attrib and 'sequence_level' in cs_row.attrib else False
             default = True
             cs = CoordSystem(cs_row.name, cs_row.version, cs_row.rank, toplevel, seqlevel, default, cs_row.species_id, cs_row.coord_system_id)
             cs_list.append(cs)
@@ -371,40 +394,10 @@ class CoordSystemAdaptor():
         cs_list = []
         for cs_row in rows:
             toplevel = False
-            seqlevel = True if 'sequence_level' in cs_row.attrib else False
+            seqlevel = True if cs_row.attrib and 'sequence_level' in cs_row.attrib else False
             default = False
             cs = CoordSystem(cs_row.name, cs_row.version, cs_row.rank, toplevel, seqlevel, default, cs_row.species_id, cs_row.coord_system_id)
             cs_list.append(cs)
 
         return cs_list
-    
-
-    @staticmethod
-    def find_common_coord_systems(source: DBConnection, target: DBConnection) -> tuple[CoordSystem]:
-        src_session = source.session_scope()
-        tgt_session = target.session_scope()
-        with src_session, tgt_session:
-            source_cs = CoordSystemAdaptor.fetch_all_default(src_session)
-            target_cs = CoordSystemAdaptor.fetch_all_default(tgt_session)
-        
-        add_common_cs = []
-        for s_cs in source_cs:
-            for t_cs in target_cs:
-                if s_cs.name == t_cs.name:
-                    if s_cs.version and s_cs.version != t_cs.version:
-                        continue
-
-                    if CoordSystemAdaptor.seq_regions_compatible(src_session, tgt_session, s_cs):
-                        add_common_cs.append(s_cs)
-                    break
-        
-        return tuple(add_common_cs)
-
-
-    @classmethod
-    def seq_regions_compatible(cls, src_session: Session, tgt_session: Session, source_cs: CoordSystem) -> bool:
-        if not isinstance(source_cs, CoordSystem):
-           raise Exception(f'You must provide a CoordSystem')
-        
-        # src_seq_regions = SliceAdaptor.fetch_all(name, version)
        

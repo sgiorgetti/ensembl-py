@@ -1,19 +1,33 @@
-from sqlalchemy import and_
+# See the NOTICE file distributed with this work for additional information
+# regarding copyright ownership.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from sqlalchemy.orm import Session, Bundle
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.engine.row import Row
 
-from ensembl.core.models import Transcript as TranscriptORM, TranscriptAttrib as TranscriptAttribORM, AttribType as AttribTypeORM
-from ensembl.core.models import Biotype, Xref, Analysis
+from ensembl.core.models import Transcript as TranscriptORM, TranscriptAttrib as TranscriptAttribORM, AttribType as AttribTypeORM, Gene as GeneORM
+from ensembl.core.models import Xref, Analysis
 
 from typing import Union
 
-from ensembl.api.core import Transcript, Location, Strand, ValueSetMetadata
+from ensembl.api.core import Transcript, Strand, Gene
 from ensembl.api.dbsql.SliceAdaptor import SliceAdaptor
+from ensembl.api.dbsql.BiotypeAdaptor import BiotypeAdaptor
 from enum import Enum
 import warnings
 
-__all__ = ['TranscriptAdaptor', 'TSLVERSION']
+__all__ = [ 'TranscriptAdaptor', 'TSLVERSION' ]
 
 class TSLVERSION(Enum):
     one = "tsl1"
@@ -59,10 +73,6 @@ class TranscriptAdaptor():
         res = (
             session.query(
                 TranscriptORM,
-                Bundle("Biotype",
-                       Biotype.so_acc,
-                       Biotype.so_term
-                ),
                 Bundle("Xref",
                        Xref.dbprimary_acc,
                        Xref.description
@@ -72,7 +82,6 @@ class TranscriptAdaptor():
                 )
             )
             .join(TranscriptORM.display_xref)
-            .join(Biotype, and_(TranscriptORM.biotype == Biotype.name, Biotype.object_type == 'transcript'))
             .join(TranscriptORM.analysis)
             .filter(TranscriptORM.stable_id == unversioned_stable_id)
             .filter(TranscriptORM.is_current == '1')
@@ -90,7 +99,7 @@ class TranscriptAdaptor():
             .filter(TranscriptAttribORM.transcript_id == res.Transcript.transcript_id)
             .all()
         )
-        return TranscriptAdaptor._transcriptrow_to_transcript(session, res, transcript_attribs)
+        return cls._transcriptrow_to_transcript(session, res, transcript_attribs)
 
 
     @classmethod
@@ -118,7 +127,7 @@ class TranscriptAdaptor():
 
     
     @classmethod
-    def fetch_all_by_gene_id(cls, session: Session, gene_internal_id: int) -> Transcript:
+    def fetch_all_by_gene_id(cls, session: Session, gene_internal_id: int) -> tuple[Transcript]:
         """
         Arg [1]    : Session session - the ORM session object to connect to the DB to
         Arg [2]    : int gene_internal_id
@@ -137,10 +146,6 @@ class TranscriptAdaptor():
         rows = (
             session.query(
                 TranscriptORM,
-                Bundle("Biotype",
-                       Biotype.so_acc,
-                       Biotype.so_term
-                ),
                 Bundle("Xref",
                        Xref.dbprimary_acc,
                        Xref.description
@@ -150,7 +155,6 @@ class TranscriptAdaptor():
                 )
             )
             .join(TranscriptORM.display_xref)
-            .join(Biotype, and_(TranscriptORM.biotype == Biotype.name, Biotype.object_type == 'transcript'))
             .join(TranscriptORM.analysis)
             .filter(TranscriptORM.gene_id == gene_internal_id)
             .filter(TranscriptORM.is_current == '1')
@@ -168,38 +172,57 @@ class TranscriptAdaptor():
                 .filter(TranscriptAttribORM.transcript_id == tr_row.Transcript.transcript_id)
                 .all()
             )
-            tr = TranscriptAdaptor._transcriptrow_to_transcript(session, tr_row, transcript_attribs)
+            tr = cls._transcriptrow_to_transcript(session, tr_row, transcript_attribs)
             transcripts.append(tr)
 
-        return transcripts
-    
-
+        return tuple(transcripts)
     
     
     @classmethod
+    def fetch_all_by_gene(cls, session: Session, gene: Gene) -> tuple[Transcript]:
+        return cls.fetch_all_by_gene_id(session, gene.internal_id)
+
+
+    @classmethod
     def _transcriptrow_to_transcript(cls, session: Session, tr_row: Row, transcript_attribs: list[Row]) -> Transcript:
         slice = SliceAdaptor.fetch_by_seq_region_id(session, tr_row.Transcript.seq_region_id)
-        sr_len = tr_row.Transcript.seq_region_end - tr_row.Transcript.seq_region_start
-        slice.location = Location(tr_row.Transcript.seq_region_start, tr_row.Transcript.seq_region_end, sr_len)
-        slice.strand = Strand.REVERSE if tr_row.Transcript.seq_region_strand == -1 else Strand.FORWARD
+        canonical_tr_id = cls._fetch_canonical_transcript_id(session, tr_row.Transcript.gene_id)
+        biotype = BiotypeAdaptor.fetch_by_name_object_type(session, tr_row.Transcript.biotype, 'transcript')
 
         tr = Transcript(
-            '.'.join((str(tr_row.Transcript.stable_id), str(tr_row.Transcript.version))),
-            tr_row.Xref.dbprimary_acc,
+            tr_row.Transcript.stable_id,
+            tr_row.Transcript.version,
+            tr_row.Transcript.transcript_id,
             slice,
-            internal_id=tr_row.Transcript.transcript_id,
-            biotype=tr_row.Transcript.biotype,
-            source=tr_row.Transcript.source
+            tr_row.Transcript.seq_region_start,
+            tr_row.Transcript.seq_region_end,
+            Strand(tr_row.Transcript.seq_region_strand),
+            tr_row.Analysis.logic_name,
+            exons=None,
+            biotype=biotype,
+            source=tr_row.Transcript.source,
+            is_canonical=True if tr_row.Transcript.transcript_id == canonical_tr_id else False,
+            external_name=tr_row.Xref.dbprimary_acc,
+            description=tr_row.Transcript.description,
+            created_date=tr_row.Transcript.created_date,
+            modified_date=tr_row.Transcript.modified_date
         )
-
-        tr.add_metadata('biotype', tr_row.Biotype.so_term)
-
-        tr.add_metadata('description', tr_row.Transcript.description)
-        tr.add_metadata('analysis', tr_row.Analysis.logic_name)
-        tr.add_metadata('created_date', tr_row.Transcript.created_date)
-        tr.add_metadata('modified_date', tr_row.Transcript.modified_date)
 
         for ta in transcript_attribs:
             tr.add_attrib(ta.AttribType.code, ta.TranscriptAttrib.value)
 
         return tr
+    
+    
+    @classmethod
+    def _fetch_canonical_transcript_id(cls, session: Session, gene_internal_id: int) -> int:
+        res = (
+            session.query(
+                GeneORM.canonical_transcript_id
+            )
+            .where(GeneORM.gene_id == gene_internal_id)
+            .first()
+        )
+        if not res:
+            return None
+        return res.canonical_transcript_id

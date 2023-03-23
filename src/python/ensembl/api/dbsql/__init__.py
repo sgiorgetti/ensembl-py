@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Ensembl API dbsql modules"""
-from .GeneAdaptor import *
-from .TranscriptAdaptor import *
-from .ExonAdaptor import *
-from .SliceAdaptor import *
-from .CoordSystemAdaptor import *
 from .AssemblyAdaptor import *
+from .BiotypeAdaptor import *
+from .CoordSystemAdaptor import *
+from .ExonAdaptor import *
+from .GeneAdaptor import *
+from .SliceAdaptor import *
+from .TranscriptAdaptor import *

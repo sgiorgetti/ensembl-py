@@ -11,18 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""API core module"""
 
-from .Assembly import *
-from .Biotype import *
-from .Exon import *
-from .Feature import *
-from .Gene import *
-from .Location import *
-from .Metadata import *
-from .Region import *
-from .Slice import *
-from .Strand import *
-from .Transcript import *
-from .ValueSetMetadata import *
-from .XrefMetadata import *
+__all__ = [ 'Biotype' ]
+
+from dataclasses import dataclass, field
+
+@dataclass
+class Biotype():
+
+    __type = 'biotype'
+
+    internal_id: int = field(repr=False)
+    name: str
+    object_type: str
+    biotype_group: str = field(repr=False)
+    so_acc: str
+    so_term: str
+    description: str = field(repr=False)
+    db_type: str = field(repr=False)
+    attrib_type_id: int = field(repr=False, default=None)
+
+
+

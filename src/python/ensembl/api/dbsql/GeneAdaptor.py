@@ -8,9 +8,11 @@ from ensembl.core.models import Xref, Analysis
 
 from typing import Optional
 
-from ensembl.api.core import Gene, Location, Strand, Slice
+from ensembl.api.core import Gene, Strand, Slice
 from ensembl.api.dbsql.SliceAdaptor import SliceAdaptor
 from ensembl.api.dbsql.TranscriptAdaptor import TranscriptAdaptor
+from ensembl.api.dbsql.BiotypeAdaptor import BiotypeAdaptor
+
 import warnings
 
 __all__ = [ 'GeneAdaptor' ]
@@ -58,9 +60,13 @@ class GeneAdaptor():
                 Bundle("Xref",
                        Xref.dbprimary_acc,
                        Xref.description
+                ),
+                Bundle("Analysis",
+                       Analysis.logic_name
                 )
             )
             .join(GeneORM.display_xref)
+            .join(GeneORM.analysis)
             .filter(GeneORM.stable_id == unversioned_stable_id)
             .filter(GeneORM.is_current == '1')
             .first()
@@ -153,12 +159,12 @@ class GeneAdaptor():
             .join(SeqRegionORM.coord_system)
             .join(GeneORM.analysis)
             .where(and_(GeneORM.is_current == '1',
-                        SeqRegionORM.name == slice.region.name,
-                        CoordSystemORM.name == slice.region.code,
-                        CoordSystemORM.version == slice.region.coord_system.version,
-                        GeneORM.seq_region_start >= slice.location.start,
-                        GeneORM.seq_region_end <= slice.location.end,
-                        GeneORM.seq_region_strand == slice.strand.value
+                        SeqRegionORM.name == slice.seq_region_name,
+                        CoordSystemORM.name == slice.coord_system.name,
+                        CoordSystemORM.version == slice.coord_system.version,
+                        GeneORM.seq_region_start >= slice.seq_region_start,
+                        GeneORM.seq_region_end <= slice.seq_region_end,
+                        GeneORM.seq_region_strand == slice.seq_region_strand.value
                         ))
         )
         if logic_name:
@@ -168,7 +174,7 @@ class GeneAdaptor():
         if biotype:
             stmt = stmt.filter(GeneORM.biotype == biotype)
         
-        rows = session.execute(stmt)
+        rows = session.execute(stmt).all()
 
         if not rows:
                 return []
@@ -196,33 +202,30 @@ class GeneAdaptor():
     def _generow_to_gene(cls, session: Session, g_row: Row, gene_attribs: list[Row], slice: Slice = None) -> Gene:
         
         if not slice:
-            g_slice = SliceAdaptor.fetch_by_seq_region_id(session, g_row.Gene.seq_region_id)
-            sr_len = g_row.Gene.seq_region_end - g_row.Gene.seq_region_start
-            g_slice.location = Location(g_row.Gene.seq_region_start, g_row.Gene.seq_region_end, sr_len)
-            g_slice.strand = Strand.REVERSE if g_row.Gene.seq_region_strand == -1 else Strand.FORWARD
-            slice = g_slice
+            slice = SliceAdaptor.fetch_by_seq_region_id(session, g_row.Gene.seq_region_id)
+        biotype = BiotypeAdaptor.fetch_by_name_object_type(session, g_row.Gene.biotype, 'gene')
 
         #if slice != g_slice: throw or extend?
 
         g = Gene(
-            '.'.join((str(g_row.Gene.stable_id), str(g_row.Gene.version))),
+            g_row.Gene.stable_id,
+            g_row.Gene.version,
+            g_row.Gene.gene_id,
             slice,
-            internal_id=g_row.Gene.gene_id,
-            biotype=g_row.Gene.biotype,
-            source=g_row.Gene.source
-        )
-
-        g.add_metadata('name', g_row.Xref.dbprimary_acc)
-
-        g.add_metadata('description', g_row.Gene.description)
-        g.add_metadata('analysis', g_row.Gene.analysis_id)
-        g.add_metadata('created_date', g_row.Gene.created_date)
-        g.add_metadata('modified_date', g_row.Gene.modified_date)
+            g_row.Gene.seq_region_start,
+            g_row.Gene.seq_region_end,
+            Strand(g_row.Gene.seq_region_strand),
+            g_row.Analysis.logic_name,
+            transcripts=None,
+            biotype=biotype,
+            source=g_row.Gene.source,
+            external_name=g_row.Xref.dbprimary_acc,
+            description=g_row.Xref.description,
+            created_date=g_row.Gene.created_date,
+            modified_date=g_row.Gene.modified_date
+        )        
 
         for ga in gene_attribs:
-            if ga.AttribType.code.lower() == 'name':
-                g.symbol = ga.GeneAttrib.value
-                continue
             g.add_attrib(ga.AttribType.code, ga.GeneAttrib.value)
                 
         return g

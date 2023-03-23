@@ -1,10 +1,24 @@
-from ensembl.api.core.Exon import SplicedExon
-from ensembl.api.core.Slice import Slice
-from typing import Optional, Union
+# See the NOTICE file distributed with this work for additional information
+# regarding copyright ownership.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-__all__ = ['Transcript']
+from . import SplicedExon, Slice, Feature, Strand, Biotype
+from typing import Union
 
-class Transcript(object):
+
+__all__ = [ 'Transcript' ]
+
+class Transcript(Feature):
     """Representation of a transcript.
 
     TO DO!!!
@@ -32,63 +46,90 @@ class Transcript(object):
  
     def __init__(self,
                  stable_id: str,
-                 symbol: str,
-                 slice: Slice,
+                 version: int = 1,
                  internal_id: Union[str, int] = None,
-                 biotype: str = None,
-                 source: str = None
+                 slice: Slice = None,
+                 start: int = None,
+                 end: int = None,
+                 strand: Strand = None,
+                 analysis: str = None,
+                 exons: list[SplicedExon] = None,
+                 biotype: Biotype = None,
+                 source: str = 'ensembl',
+                 is_current: bool = True,
+                 is_canonical: bool = False,
+                 external_name: str = None,
+                 external_db: str = None,
+                 external_status: str = None,
+                 display_xref: str = None,
+                 description: str = None,
+                 created_date: str = None,
+                 modified_date: str = None,
+                 spliced_seq: str = None,
+
                 ) -> None:
+        
+
         if not stable_id:
-            raise ValueError()
-        if not symbol:
             raise ValueError()
         if not Slice:
             raise ValueError()
-        if stable_id.find('.') < 0:
+        if stable_id.find('.') > 0:
             raise ValueError()
-        (self._unversioned_stable_id, self._version) = stable_id.split('.')
-        self._symbol = symbol
+        self._stable_id = stable_id
+        self._version = version
+        
         self._slice = slice
-        self._metadata = {}
         self._attributes = {}
+        self._exons = [] if not exons else exons
         self._internal_id = internal_id
         self._biotype = biotype
         self._source = source
+        self._is_current = is_current
+        self._is_canonical = is_canonical
+        self._spliced_seq = spliced_seq
+
+        self._external_name = external_name
+        self._external_db = external_db
+        self._external_status = external_status
+        self._display_xref = display_xref
+        self._description = description
+
+        super().__init__(start, end, strand, slice, analysis, internal_id, created_date, modified_date)
+        
+        
 
     def __repr__(self) -> str:
-        if self._unversioned_stable_id:
+        if self._stable_id:
             if self._attributes.get('is_canonical'):
                 return f'{self.__class__.__name__}({self.stable_id} - canonical)'
             return f'{self.__class__.__name__}({self.stable_id})'
         return f'{self.__class__.__name__}(internal_id{self._internal_id})'
     
     @property
+    def name(self) -> str:
+        if self._external_name:
+            return self._external_name
+        return self.stable_id
+    
+    @property
+    def stable_id_version(self) -> str:
+        return f"{self._stable_id}.{self._version}"
+    
+    @property
     def stable_id(self) -> str:
-        return f"{self._unversioned_stable_id}.{self._version}"
+        return self._stable_id
 
     @stable_id.setter
     def stable_id(self, value: str) -> None:
-        (self._unversioned_stable_id, self._version) = value.split('.')
-    
-    @property
-    def symbol(self) -> str:
-        return self._symbol
-
-    @symbol.setter
-    def symbol(self, value: str) -> None:
-        self._symbol = value
+        if value.find('.') > 0:
+            (self._stable_id, self._version) = value.split('.')
+        else:
+            self._stable_id = value
     
     @property
     def type(self) -> str:
         return self.__type
-
-    @property
-    def unversioned_stable_id(self) -> str:
-        return self._unversioned_stable_id
-
-    @unversioned_stable_id.setter
-    def unversioned_stable_id(self, value) -> None:
-        self._unversioned_stable_id = value
 
     @property
     def version(self):
@@ -99,14 +140,6 @@ class Transcript(object):
         self._version = value
 
     @property
-    def slice(self) -> Slice:
-        return self._slice
-    
-    @slice.setter
-    def slice(self, value: Slice) -> None:
-        self._slice = value
-
-    @property
     def internal_id(self) -> int:
         return self._internal_id
     
@@ -115,11 +148,11 @@ class Transcript(object):
         return self._internal_id
     
     @property
-    def biotype(self) -> str:
+    def biotype(self) -> Biotype:
         return self._biotype
 
     @biotype.setter
-    def biotype(self, value: str) -> None:
+    def biotype(self, value: Biotype) -> None:
         self._biotype = value
 
     @property
@@ -129,6 +162,64 @@ class Transcript(object):
     @source.setter
     def source(self, value: str) -> None:
         self._source = value
+
+    @property
+    def is_current(self) -> bool:
+        return self._is_current
+
+    @is_current.setter
+    def is_current(self, value: bool) -> None:
+        self._is_current = value
+
+    @property
+    def spliced_seq(self) -> str:
+        self._spliced_seq
+
+    @spliced_seq.setter
+    def spliced_seq(self, value: str) -> None:
+        self._spliced_seq = value
+
+    @property
+    def external_name(self) -> str:
+        return self._external_name
+
+    @external_name.setter
+    def external_name(self, value: str) -> None:
+        self._external_name = value
+
+    @property
+    def external_db(self) -> str:
+        return self._external_db
+
+    @external_db.setter
+    def external_db(self, value: str) -> None:
+        self._external_db = value
+
+    @property
+    def external_status(self) -> str:
+        return self._external_status
+
+    @external_status.setter
+    def external_status(self, value: str) -> None:
+        self._external_status = value
+
+    @property
+    def display_xref(self) -> str:
+        return self._display_xref
+
+    @display_xref.setter
+    def display_xref(self, value: str) -> None:
+        self._display_xref = value
+
+    @property
+    def description(self) -> str:
+        return self._description
+
+    @description.setter
+    def description(self, value: str) -> None:
+        self._description = value
+
+
 
     def get_exons(self) -> list[SplicedExon]:
         return self._exons
@@ -142,14 +233,6 @@ class Transcript(object):
     def set_introns(self, introns: list) -> None:
         self._introns = introns
     
-    def get_metadata(self, md: Optional[str] = None) -> Union[dict, tuple]:
-        if md is None:
-            return self._metadata
-        return tuple(md, self._metadata.get(md))
-    
-    def add_metadata(self, code: str, value: str):
-        self._attributes[code] = value
-    
     def set_attribs(self, attribs: dict[str, str]) -> None:
         self._attributes = attribs
 
@@ -162,9 +245,7 @@ class Transcript(object):
         self._attributes[code] = value
 
     def is_canonical(self) -> bool:
-        if self._attributes.get('is_canonical'):
-            return True
-        return False
+        return True if self._is_canonical else False
     
     def is_mane_select(self) -> bool:
         if self._attributes.get('MANE_Select'):
@@ -185,20 +266,14 @@ class Transcript(object):
         Returns       : Dict[str, str]
         Status        : Alpha - Intended for internal use
         """
-        summary = {}
-        summary['id'] = self.unversioned_stable_id
-        summary['transcript_id'] = self.unversioned_stable_id
-        summary['version'] = self.version if self.version else ''
-        summary['start'] = self._slice.location.start
-        summary['end'] = self._slice.location.end
-        summary['strand'] = self._slice.strand.value
-        summary['seq_region_name'] = self._slice.region.name
+        summary = super().get_summary()
+        summary['transcript_id'] = self._stable_id
 
-        summary['description'] = self._attributes.get('description').value
-        summary['biotype'] = self._biotype
+        summary['description'] = self._description
+        summary['biotype'] = self._biotype.name
         summary['source'] = self._source
-        summary['symbol'] = self._symbol
-        summary['logic_name'] = self._attributes.get('analysis').value
+        summary['symbol'] = self._external_name
+        summary['logic_name'] = summary['analysis']
         if self._attributes.get('ccds_transcript'):
             summary['ccdsid'] = self._attributes.get('ccds_transcript').value
         if self._attributes.get('tsl'):
@@ -220,11 +295,11 @@ class Transcript(object):
         qualifiers = {
             'source': self._source,
             'score': ".",
-            'ID': f"{self.__type}:{self._unversioned_stable_id}",
+            'ID': f"{self.__type}:{self._stable_id}",
             'Parent': "gene:ENSG00000186092",
-            'Name': self._symbol,
-            'biotype': self._biotype,
-            'transcript_id': self._unversioned_stable_id,
+            'Name': self._external_name,
+            'biotype': self._biotype.name,
+            'transcript_id': self._stable_id,
             'version': self._version
         }
         qualifiers['tag'] = tuple(tags)
