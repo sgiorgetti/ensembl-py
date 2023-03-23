@@ -106,7 +106,7 @@ In this exercise, the target scenario is related to the `IDMapping` re-implement
 - Basic feature classes compatible with `ensembl-genes-api` and `ensembl`  concepts
 - Minimal feature adaptors for MySQL, using SQL Alchemy's one from `ensembl-py`
 - Minimal feature adaptors for GFF/GTF file, using something as close as possible to `ensembl-genes-api`'s
-- Building the ID Mapping Cache file
+- Building the ID Mapping Cache file ==> THIS MAKES NO SENSE, as it would require the full mapping and CS features of the API. Better keep the cache building as it is, and re-implement the ID Mapping logic with new tech!
 
 
 

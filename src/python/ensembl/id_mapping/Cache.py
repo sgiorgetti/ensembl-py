@@ -62,12 +62,15 @@ class Cache():
 
         if dbtype.name == 'SOURCE':
             session = src_session
-        elif dbtype == 'TARGET':
+        elif dbtype.name == 'TARGET':
             session = tgt_session
         else:
             raise Exception('Undefined dbtype: must be (SOURCE|TARGET)')
 
         slice = SliceAdaptor.fetch_by_name(session, slice_name)
+        if not slice:
+            raise Exception(f'Could not retrieve slice {slice_name}.')
+        
         genes = GeneAdaptor.fetch_all_by_Slice(session, slice, load_transcripts=True)
 
         # find common coord_system
@@ -114,15 +117,15 @@ class Cache():
         if not isinstance(source_cs, CoordSystem):
            raise Exception(f'You must provide a CoordSystem')
         
-        src_seq_regions = SliceAdaptor.fetch_all(src_session, source_cs.name, source_cs.version)
-        tgt_seq_regions = SliceAdaptor.fetch_all(tgt_session, source_cs.name, source_cs.version)
+        src_seq_regions = SliceAdaptor.fetch_all(src_session, source_cs.name, source_cs.version, include_duplicates=True)
+        tgt_seq_regions = SliceAdaptor.fetch_all(tgt_session, source_cs.name, source_cs.version, include_duplicates=True)
         # sanity check to prevent divison by zero
         s_sr_count = len(src_seq_regions)
         t_sr_count = len(tgt_seq_regions)
         if s_sr_count == 0 or t_sr_count == 0:
             return False
         
-        sr_match = { sr.name: sr.region.length for sr in src_seq_regions }
+        sr_match = { sr.name: sr.length for sr in src_seq_regions }
 
         equal = 0.0
 
@@ -223,3 +226,17 @@ class Cache():
             # build transcript caches
             # $self->add( 'transcripts_by_id',      $type, $tr->dbID, $ltr );
             # $self->add( 'genes_by_transcript_id', $type, $tr->dbID, $lgene );
+
+
+from ensembl.database.dbconnection import DBConnection
+def main():
+    dbc1 = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/homo_sapiens_core_110_38')
+    dbc2 = DBConnection('mysql://ensro@mysql-ens-mirror-1.ebi.ac.uk:4240/homo_sapiens_core_109_38')
+    with dbc1.session_scope() as tgt_session, dbc2.session_scope() as src_session:
+        aa = Cache.find_common_coord_systems(src_session, tgt_session)
+        print(f'Found {len(aa)} records')
+        for a in aa:
+            print(f'\t{a}')
+
+if __name__ == '__main__':
+    main()

@@ -296,7 +296,7 @@ class Transcript(Feature):
             'source': self._source,
             'score': ".",
             'ID': f"{self.__type}:{self._stable_id}",
-            'Parent': "gene:ENSG00000186092",
+            'Parent': "None",
             'Name': self._external_name,
             'biotype': self._biotype.name,
             'transcript_id': self._stable_id,

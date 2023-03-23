@@ -39,6 +39,8 @@ def testDumpGFFGene(gene: Gene, assembly: Assembly):
     sub_feats = []
     for transcript in gene.get_transcripts():
         sub_qualifiers = transcript.gff3_qualifiers()
+        # gene:ENSG00000186092
+        sub_qualifiers['Parent'] = f'{gene.type}:{gene.stable_id}'
         sub_feats.append(
             SeqFeature(FeatureLocation(transcript.start-1, transcript.end),
                        type=f"{transcript.biotype.so_term}",
