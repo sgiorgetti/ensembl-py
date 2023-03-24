@@ -17,8 +17,7 @@ __all__ = [ 'SliceAdaptor' ]
 class SliceAdaptor():
     """Contains all the slice related functions over Slice ORM
     """
-    _asm_exc_cache: tuple = ()
-    
+    # _asm_exc_cache: tuple = ()
     @classmethod
     def fetch_by_seq_region(cls,
                             session: Session,
@@ -286,121 +285,10 @@ class SliceAdaptor():
                 1,
                 length,
                 topology = tpl
-            )  
+            )
+            out_slices.append(slice)
 
-            if not include_duplicates:
-                if not cls._asm_exc_cache:
-                    cls._build_exception_cache(session, cs.species_id)
-                    if len(cls._asm_exc_cache) > 0:
-                        raise Exception('Cannot handle assembly exceptions. Sorry!')
-                # projection = fetch_normalized_slice_projection($slice)}
-                # for segment in projection:
-                #     out_slices.append() if segment[2] == slice else continue
-                raise NotImplemented()
-            else:
-                out_slices.append(slice)
-
-        return out_slices 
-
-    
-
-    @classmethod
-    def fetch_normalized_slice_projection(cls, session: Session, slice: Slice, filter_projections: bool = False):
-        """
-        Arg [1]    : Session session - sqlalchemy.orm.Session object to connect to DBs
-        Arg [2]    : ensembl.api.core.Slice slice
-        Arg [3]    : bool filter_projections (default False)
-                     Optionally filter the projections to remove anything 
-                     which is the same sequence region as the given slice
-        Example    :  ( optional )
-        Description: gives back a project style result. The returned slices 
-                     represent the areas to which there are symlinks for the 
-                     given slice. start, end show which area on given slice is 
-                     symlinked
-        Returntype : [[start,end,$slice][]]
-        Exceptions : none
-        Caller     : BaseFeatureAdaptor
-        Status     : At Risk
-                   : under development
-        """
-        slice_seq_region_id = slice.get_seq_region_id()
-        if not cls._asm_exc_cache:
-            cls._build_exception_cache(session, slice.coord_system.species_id)
-        # "assembly_exception_id","seq_region_id","seq_region_start","seq_region_end","exc_type","exc_seq_region_id","exc_seq_region_start","exc_seq_region_end","ori"
-        # 2,131553,56887903,57217415,"PAR",131539,155701383,156030895,1
-        # 3,131561,2448811,2803254,"HAP",131550,2448811,2791270,1
-        
-        # this below returns
-        # no results when no asm exc are found
-        # 1 result in the usual case of HAP
-        # 2 results only in the case of PAR
-        result = [ax for ax in cls._asm_exc_cache if ax.seq_region_id == slice_seq_region_id]
-        # AsmExc = namedtuple('AsmExc', ['seq_region_start', 'seq_region_end',
-        #                                'exc_seq_region_id', 'exc_seq_region_start',
-        #                                 'exc_seq_region_end'])
-
-        for asm_exc in result:
-            # ( seq_region_start, seq_region_end,
-            #  exc_type, exc_seq_region_id, exc_seq_region_start,
-            # exc_seq_region_end ) = row[1:]
-            # asm_exc = AsmExc((row[1:2],row[4:6]))
-            # exc_type = row[4]
-
-            # need overlapping PAR and all HAPs if any
-            pars = []
-            haps = []
-            if asm_exc.exc_type == 'PAR':
-                if asm_exc.seq_region_start <= slice.end and asm_exc.seq_region_end >= slice.start:
-                    pars.append(asm_exc)
-            else: # this is for HAP
-                haps.append(asm_exc)
-
-        if len(pars) + len(haps) == 0:
-            return "" # [bless ( [1,$slice->length, $slice], "Bio::EnsEMBL::ProjectionSegment")];
-        
-        syms = []
-        if len(haps) > 0:
-            # un-needed: we do not have patches on patches
-            # sorted_haps = sorted(haps, key=lambda x: x.seq_region_start)
-            sorted_haps = haps
-
-            chr_start = 1
-            chr_end = 1
-            hap_start = 1
-            hap_end = 1
-
-            # this is un-needed: slice needs to be one from the DB, and here we re-fetch it
-            # seq_region_slice = cls.fetch_by_seq_region_id(session, slice_seq_region_id)
-            seq_region_slice = slice
-            exc_slice = cls.fetch_by_seq_region_id(session, sorted_haps[0].exc_seq_region_id)
-            len1 = seq_region_slice.length()
-            len2 = exc_slice.length()
-            max_len = max(len1, len2)
-
-            for h in sorted_haps:
-                hap_end = h.seq_region_start - 1
-                chr_end = h.exc_seq_region_start - 1
-                if hap_end and hap_start < len1:
-                    syms.append( (hap_start, hap_end, sorted_haps[0].exc_seq_region_id, chr_start, chr_end) )
-                chr_start = chr_end + (h.exc_seq_region_end-h.exc_seq_region_start) + 2
-                hap_start = hap_end + (h.seq_region_end-h.seq_region_start) + 2
-            diff = (hap_end-hap_start)-(chr_end-chr_start)
-            if diff > 0:
-                syms.append( (hap_start, hap_end, sorted_haps[0].exc_seq_region_id, chr_start, chr_end+diff) )
-            elif diff < 0:
-                syms.append( (hap_start, hap_end-diff, sorted_haps[0].exc_seq_region_id, chr_start, chr_end) )
-            else:
-                syms.append( (hap_start, hap_end, sorted_haps[0].exc_seq_region_id, chr_start, chr_end) )
-        
-        syms.extend(pars)
-
-            
-                
-
-
-
-
-
+        return out_slices          
 
 
     @classmethod
@@ -487,31 +375,31 @@ class SliceAdaptor():
             return res
         return ""
     
-    @classmethod
-    def _build_exception_cache(cls, session: Session, species_id: int) -> None:
-        # build up a cache of the entire assembly exception table
-        # it should be small anyway
-        stmt = (select(AssemblyExceptionORM)
-            .join(SeqRegionORM, SeqRegionORM.seq_region_id == AssemblyExceptionORM.seq_region_id)
-            .join(CoordSystemORM, CoordSystemORM.coord_system_id == SeqRegionORM.coord_system_id)
-            .where(CoordSystemORM.species_id == species_id)
-        )
-        res = session.scalars(stmt).all()
-        myasm = []
-        for r in res:
-            myasm.append(r)
-        cls._asm_exc_cache = tuple(myasm)
+    # @classmethod
+    # def _build_exception_cache(cls, session: Session, species_id: int) -> None:
+    #     # build up a cache of the entire assembly exception table
+    #     # it should be small anyway
+    #     stmt = (select(AssemblyExceptionORM)
+    #         .join(SeqRegionORM, SeqRegionORM.seq_region_id == AssemblyExceptionORM.seq_region_id)
+    #         .join(CoordSystemORM, CoordSystemORM.coord_system_id == SeqRegionORM.coord_system_id)
+    #         .where(CoordSystemORM.species_id == species_id)
+    #     )
+    #     res = session.scalars(stmt).all()
+    #     myasm = []
+    #     for r in res:
+    #         myasm.append(r)
+    #     cls._asm_exc_cache = tuple(myasm)
 
 
 
 from ensembl.database.dbconnection import DBConnection
 def main():
-    # dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/homo_sapiens_core_110_38')
-    dbc = DBConnection('mysql://ensro@mysql-ens-mirror-1.ebi.ac.uk:4240/homo_sapiens_core_109_38')
+    dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/homo_sapiens_core_110_38')
+    # dbc = DBConnection('mysql://ensro@mysql-ens-mirror-1.ebi.ac.uk:4240/homo_sapiens_core_109_38')
     with dbc.session_scope() as session:
         # slice = SliceAdaptor.fetch_by_seq_region_id(session, 131550)
-        slice = SliceAdaptor.fetch_by_seq_region_id(session, 2006139913)
-        aa = SliceAdaptor.fetch_normalized_slice_projection(session, slice)
+        slices = SliceAdaptor.fetch_all(session, 'chromosome', 'GRCh38', include_duplicates=True)
+        print("hiya!")
 
 if __name__ == "__main__":
     main()

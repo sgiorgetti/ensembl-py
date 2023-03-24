@@ -18,11 +18,6 @@ from .Biotype import *
 from .Exon import *
 from .Feature import *
 from .Gene import *
-from .Location import *
-from .Metadata import *
-from .Region import *
 from .Slice import *
 from .Strand import *
 from .Transcript import *
-from .ValueSetMetadata import *
-from .XrefMetadata import *
