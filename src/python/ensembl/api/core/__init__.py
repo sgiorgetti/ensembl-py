@@ -21,3 +21,4 @@ from .Gene import *
 from .Slice import *
 from .Strand import *
 from .Transcript import *
+from .Translation import *

@@ -72,11 +72,11 @@ class Feature():
             return True if self.internal_id == __o.internal_id else False
         
         # If the features have the same start, end, strand and seq_region_id,
-        # and anal ysis_id, they are equal.
+        # and analysis_id, they are equal.
         if (self.start == __o.start 
             and self.end == __o.end
             and self.strand == __o.strand
-            and self.slice.get_seq_region_id() == __o.slice.get_seq_region_id()
+            and self._slice.get_seq_region_id() == __o._slice.get_seq_region_id()
             and self.analysis == __o.analysis):
             return True
         else:
@@ -151,6 +151,16 @@ class Feature():
     def modified_date(self, value: str) -> None:
         self._modified_date = value
 
+    @property
+    def length(self) -> int:
+        if self._end < self._start:
+            # if circular, we can work out the length of an origin-spanning
+            # feature using the size of the underlying region.
+            if self._slice.is_circular():
+                len = self._slice.seq_region_length - (self._start-self._end) + 1
+                return len
+            raise Exception(f'Cannot determine length of non-circular feature where start > end')
+        return self._end - self._start + 1
     
     @property
     @cache
@@ -190,25 +200,42 @@ class Feature():
             # aaaa
         )
 
+    @property
     def seq_region_name(self) -> str:
         return self._slice.seq_region_name() if self._slice else ''
     
     #  FROM SLICE
     # sub seq_region_length
-    def seq_region_length(self):
-        raise NotImplemented()
+    @property
+    def seq_region_length(self) -> int:
+        return self._slice.seq_region_length
     # sub seq_region_strand 
-    def seq_region_strand(self):
-        raise NotImplemented()
+    @property
+    def seq_region_strand(self) -> Strand:
+        st = self._slice.strand.value * self._strand.value
+        return Strand(st) if self._slice.strand else Strand.UNDEFINED
     # sub seq_region_start
-    def seq_region_start(self):
-        raise NotImplemented()
+    @property
+    def seq_region_start(self) -> int:
+        if self._slice.strand == Strand.FORWARD:
+            return self._slice.seq_region_start + self._start - 1
+        else:
+            return self._slice.seq_region_end - self._end + 1
     # sub seq_region_end
-    def seq_region_end(self):
-        raise NotImplemented()
+    @property
+    def seq_region_end(self) -> int:
+        if self._slice.strand == Strand.FORWARD:
+            return self._slice.seq_region_start + self._end - 1
+        else:
+            return self._slice.seq_region_end + self._start + 1
     # sub coord_system_name
-    def coord_system_name(self):
-        raise NotImplemented()
+    @property
+    def coord_system_name(self) -> str:
+        return self._slice.coord_system_name
+    
+    @property
+    def coord_system_version(self) -> str:
+        return self._slice.coord_system_version
 
     # sub seq
     def seq(self):
@@ -216,11 +243,11 @@ class Feature():
 
     def get_summary(self) -> dict:
         summary = {}
-        summary['id'] = self._display_id
+        summary['id'] = self.internal_id
         summary['version'] = self._version if self._version else ''
-        summary['start'] = self.seq_region_start
-        summary['end'] = self.seq_region_end
+        summary['start'] = self.seq_region_start()
+        summary['end'] = self.seq_region_end()
         summary['strand'] = self._strand
-        summary['seq_region_name'] = self.seq_region_name
+        summary['seq_region_name'] = self.seq_region_name()
         return summary
 

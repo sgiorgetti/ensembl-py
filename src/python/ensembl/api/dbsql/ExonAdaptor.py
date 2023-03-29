@@ -24,6 +24,8 @@ from typing import Union
 from ensembl.api.core import Exon, SplicedExon, Slice, Strand, Transcript
 from ensembl.api.dbsql.SliceAdaptor import SliceAdaptor
 
+from ensembl.api.dbsql.Utils import timeme
+
 __all__ = [ 'ExonAdaptor' ]
 
 class ExonAdaptor():
@@ -33,8 +35,7 @@ class ExonAdaptor():
     @classmethod
     def fetch_by_stable_id(cls, session: Session, stable_id: str) -> Exon:
         """
-        Arg [1]    : ensembl.database.dbconnection.DBConnection dbconnection
-                     The DB Connection object
+        Arg [1]    : sqlalchemy.orm.Session session
         Arg [2]    : str stable_id
                      The stable id of the exon to retrieve
         Example    : exon = ExonAdaptor.fetch_by_stable_id(dbc, 'ENSE00001544499')
@@ -54,13 +55,14 @@ class ExonAdaptor():
         .first())
         if not res:
                 raise NoResultFound(f'Could not find {stable_id} as current stable_id')
-        return res
+        
+        slice = SliceAdaptor.fetch_by_seq_region_id(session, res.Exon.seq_region_id)
+        return cls._exonrow_to_exon(slice, res)
 
     @classmethod
     def fetch_by_stable_id_version(cls, session: Session, unversioned_stable_id: str, version: Union[str, int]) -> Exon:
         """
-        Arg [1]    : ensembl.database.dbconnection.DBConnection dbconnection
-                     The DB Connection object
+        Arg [1]    : sqlalchemy.orm.Session session
         Arg [2]    : str stable_id
                      The stable id of the exon to retrieve
         Example    : exon = ExonAdaptor.fetch_by_stable_id(dbc, 'ENSE00001544499')
@@ -81,10 +83,11 @@ class ExonAdaptor():
         .first())
         if not res:
                 raise NoResultFound(f'Could not find {unversioned_stable_id} v.{version} as current stable_id')
-        slice = SliceAdaptor.fetch_by_seq_region_id(session, res[0].seq_region_id)
-        return cls._exonrow_to_exon(slice, res[0])
+        slice = SliceAdaptor.fetch_by_seq_region_id(session, res.Exon.seq_region_id)
+        return cls._exonrow_to_exon(slice, res)
 
     @classmethod
+    @timeme
     def fetch_all_by_Transcript(cls, session: Session, transcript: Transcript) -> list[SplicedExon]:
         """
         Arg [1]    : sqlalchemy.orm.Session session
@@ -99,18 +102,16 @@ class ExonAdaptor():
         if not transcript:
             raise ValueError("Transcript must be specified!")
         
-        tr_stable_id = transcript.stable_id
         exon_rows = (
              session.query(Bundle("Transcript",
-                            TranscriptORM.stable_id,
-                            TranscriptORM.is_current,
                             TranscriptORM.source
                            ),
                            Bundle("ExonTranscript", ExonTranscriptORM.rank),
                            ExonORM)
                 .join(TranscriptORM.exons)
                 .join(ExonTranscriptORM.exon)
-                .filter(and_(TranscriptORM.stable_id == tr_stable_id, TranscriptORM.is_current == 1))
+                .filter(and_(TranscriptORM.transcript_id == transcript.internal_id, 
+                             TranscriptORM.is_current == 1))
                 .order_by(ExonTranscriptORM.rank)
                 .all()
         )
@@ -120,6 +121,34 @@ class ExonAdaptor():
         return exons
             
 
+    @classmethod
+    def fetch_by_internal_id(cls, session: Session, internal_id: int) -> Exon:
+        """
+        Arg [1]    : sqlalchemy.orm.Session session
+        Arg [2]    : internal_id: int
+                     The internal id (dbID) of the exon to retrieve
+        Example    : exon = ExonAdaptor.fetch_by_internal_id(session, 1234)
+        Description: Retrieves an Exon from the database via its stable id
+        Returntype : ensembl.api.core.Exon in native coordinates.
+        Exceptions : NoResultFound, ValueError
+        Caller     : general
+        Status     : Alpha
+        """
+        if internal_id is None or not isinstance(internal_id, int):
+             return None
+        
+        stmt = (select(ExonORM)
+        .where(ExonORM.exon_id == internal_id)
+        .where(ExonORM.is_current == 1)
+        )
+
+        res = (session.execute(stmt)
+        .first())
+        if not res:
+                raise NoResultFound(f'Could not find exon with exon_id {internal_id}.')
+        slice = SliceAdaptor.fetch_by_seq_region_id(session, res[0].seq_region_id)
+        return cls._exonrow_to_exon(slice, res)
+    
 
     @classmethod
     def _exonrow_to_exon(cls, exon_slice: Slice, row: Row) -> Exon:
@@ -130,12 +159,12 @@ class ExonAdaptor():
              row.Exon.end_phase,
              row.Exon.exon_id,
              exon_slice,
-             row.Exon.start,
-             row.Exon.end,
-             Strand(row.Exon.strand),
+             row.Exon.seq_region_start,
+             row.Exon.seq_region_end,
+             Strand(row.Exon.seq_region_strand),
              None,
-             row.is_constitutive,
-             row.Exon.is_current,
+             True if row.Exon.is_constitutive else False,
+             True if row.Exon.is_current else False,
              created_date=row.Exon.created_date,
              modified_date=row.Exon.modified_date
             )

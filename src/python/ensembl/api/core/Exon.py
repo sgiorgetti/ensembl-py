@@ -121,15 +121,14 @@ class Exon(Feature):
 
     @property
     def frame(self):
-        location = self._slice.location
         if self._phase == -1:
             return '.' # gff convention for no frame info
         if self._phase == 0:
-            return location.start%3
+            return self._start%3
         if self._phase == 1:
-            return (location.start + 2)%3
+            return (self._start + 2)%3
         if self._phase == 2:
-            return (location.start + 1)%3
+            return (self._start + 1)%3
         raise Exception(f"bad phase in exon {self.phase}")
     
     @property
@@ -207,6 +206,8 @@ class SplicedExon(Exon):
                        modified_date
                        )
         
+    def __repr__(self) -> str:
+        return super().__repr__()
     
     @property
     def index(self) -> int:
@@ -220,6 +221,7 @@ class SplicedExon(Exon):
     def transcript_source(self) -> str:
         return self._transcript_source
 
+
     def get_summary(self) -> dict[str, str]:
         """
         Example       : exon_summary = exon.get_summary()
@@ -230,6 +232,7 @@ class SplicedExon(Exon):
         summary = super().get_summary()
         summary['exon_index'] = self._index
         return summary
+    
     
     # 1       havana  exon    65419   65433   .       +       .       Parent=transcript:ENST00000641515;Name=ENSE00003812156;constitutive=1;ensembl_end_phase=-1;ensembl_phase=-1;exon_id=ENSE00003812156;rank=1;version=1
     def gff3_qualifiers(self) -> dict[str, Union[str, tuple[str]]]:

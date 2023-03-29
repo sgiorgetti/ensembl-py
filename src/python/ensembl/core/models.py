@@ -544,6 +544,10 @@ class Translation(Base):
         "Transcript",
         primaryjoin="Translation.transcript_id == Transcript.transcript_id",
     )
+    translation_attribs = relationship(
+        "TranslationAttrib",
+        primaryjoin="Translation.translation_id == TranslationAttrib.translation_id"
+    )
 
 
 class UnmappedReason(Base):
@@ -1072,7 +1076,7 @@ class TranscriptSupportingFeature(Base):
 
 
 class TranslationAttrib(Base):
-    __tablename__ = ("translation_attrib",)
+    __tablename__ = "translation_attrib"
     __table_args__ = (
         Index("type_val_idx", "attrib_type_id", "value"),
         Index(
@@ -1098,6 +1102,8 @@ class TranslationAttrib(Base):
         server_default=text("'0'"),
     )
     value = Column(Text, primary_key=True, nullable=False, index=True)
+    attribs = relationship("AttribType", primaryjoin="TranslationAttrib.attrib_type_id == AttribType.attrib_type_id")
+
 
 
 #  t_translation_attrib = Table(

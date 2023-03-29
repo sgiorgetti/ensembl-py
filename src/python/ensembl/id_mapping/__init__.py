@@ -14,6 +14,7 @@
 """id_mapping module"""
 from .TinyFeature import *
 from .TinyGene import *
-# from .TinyTranslation import *
 from .TinyExon import *
 from .TinyTranscript import *
+from .TinyTranslation import *
+from .Utils import *

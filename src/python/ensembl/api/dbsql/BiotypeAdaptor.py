@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.engine.row import Row
-from sqlalchemy.orm.exc import NoResultFound
 
 from ensembl.core.models import Biotype as BiotypeORM
 
@@ -52,24 +51,16 @@ class BiotypeAdaptor():
         Returntype : ensembl.api.core.Biotype
         Exceptions : none
         """
-        if object_type == 'gene' and cls._gene_biotypes:
-            return cls._gene_biotypes.get(name)
-        if object_type == 'transcript' and cls._transcript_biotypes:
-            return cls._transcript_biotypes.get(name)
-        
-        res = (session.query(BiotypeORM)
-               .where(
-                and_(
-                    BiotypeORM.name == name,
-                    BiotypeORM.object_type == object_type
-                )
-               ).first())
-        
-        biotype = Biotype(name=name, object_type=object_type) if not res else cls._biotyperow_to_biotype(session, res)
         if object_type == 'gene':
-            cls._gene_biotypes[name] = biotype
-        if object_type == 'transcript':
-            cls._transcript_biotypes[name] = biotype
+            if not cls._gene_biotypes:
+                cls.fetch_all_by_object_type(session, object_type, flush_cache=True)
+            biotype = Biotype(name=name, object_type=object_type) if not cls._gene_biotypes.get(name) else cls._gene_biotypes.get(name)
+        elif object_type == 'transcript':
+            if not cls._transcript_biotypes:
+                cls.fetch_all_by_object_type(session, object_type, flush_cache=True)
+            biotype = Biotype(name=name, object_type=object_type) if not cls._transcript_biotypes.get(name) else cls._transcript_biotypes.get(name)
+        else:
+            biotype = None
         
         return biotype
     
@@ -111,7 +102,7 @@ class BiotypeAdaptor():
             return biotypes
         
         for row in rows:
-            biotype = cls._biotyperow_to_biotype(session, row)
+            biotype = cls._biotyperow_to_biotype(row)
             biotypes.append(biotype)
             if object_type == 'gene':
                 cls._gene_biotypes[biotype.name] = biotype
@@ -122,7 +113,7 @@ class BiotypeAdaptor():
     
 
     @classmethod
-    def _biotyperow_to_biotype(cls, session: Session, row: Row) -> Biotype:
+    def _biotyperow_to_biotype(cls, row: Row) -> Biotype:
         return Biotype(
             row.biotype_id,
             row.name,

@@ -54,6 +54,7 @@
 
 from .TinyFeature import TinyFeature
 from .TinyTranscript import TinyTranscript
+from ensembl.api.core.Strand import Strand
 from ensembl.api.core.Transcript import Transcript
 from typing import Union
 import warnings
@@ -75,7 +76,7 @@ class TinyGene(TinyFeature):
                  modified_date: int,
                  start: int,
                  end: int,
-                 strand: int,
+                 strand: Strand,
                  seq_region_name: str = None,
                  biotype: str = None,
                  transcripts: list[TinyTranscript] = None) -> None:
@@ -83,7 +84,7 @@ class TinyGene(TinyFeature):
         self._start = start
         self._end = end
         self._strand = strand
-        self._transcripts = transcripts
+        self._transcripts = transcripts if transcripts else []
         self._biotype = biotype
         self._seq_region_name = seq_region_name
 
@@ -141,10 +142,10 @@ class TinyGene(TinyFeature):
         self._end = end
     
     @property
-    def strand(self) -> int:
+    def strand(self) -> Strand:
         """
         Description : Getter for the gene's strand coordinate.
-        Return type : Int
+        Return type : Strand
         Exceptions  : none
         Caller      : general
         Status      : At Risk
@@ -153,17 +154,19 @@ class TinyGene(TinyFeature):
         return self._strand
     
     @strand.setter
-    def strand(self, strand: int) -> None:
+    def strand(self, strand: Union[int, Strand]) -> None:
         """
         Arg[1]      : Int - the gene's strand coordinate
         Description : Setter for the gene's strand coordinate.
         Return type : none
-        Exceptions  : thrown on missing argument
+        Exceptions  : thrown on missing or wrong argument
         Caller      : general
         Status      : At Risk
                     : under development
         """
-        self._strand = strand
+        if not isinstance(strand, int) or not isinstance(strand, Strand):
+            raise ValueError(f'Strand must be int or Strand enum type.')
+        self._strand = Strand(strand) if isinstance(strand, int) else  strand
 
     @property
     def biotype(self) -> str:
@@ -252,41 +255,39 @@ class TinyGene(TinyFeature):
             self._transcripts.extend(transcripts)
         return None
     
-    def add_fat_transcripts(self, fat_transcripts: list[Transcript]) -> None:
+    def add_fat_transcript(self, tr: Transcript) -> TinyTranscript:
         """
-        Arg[1]      : ensembl.api.core.Transcript fat_transcripts - the transcript list to add
-        Example     : tiny_transcript.add_transcript(fat_transcripts)
-        Description : Adds transcript list to this gene.
-        Return type : none
+        Arg[1]      : ensembl.api.core.Transcript tr - the transcript to add
+        Example     : tiny_gene.add_transcript(fat_transcript)
+        Description : Adds tiny transcript to this gene.
+        Return type : TinyTranscript
         Exceptions  : none
         Caller      : general
         Status      : At Risk
                     : under development
         """
-        if not fat_transcripts:
-            warnings.warn(f"Provided transcript list is empty or None", UserWarning)
-            return
-        if not isinstance(fat_transcripts[0], Transcript):
-            warnings.warn(f"Provided list is not made of Transcript objects", UserWarning)
+        if not tr or not isinstance(tr, Transcript):
+            warnings.warn(f"You should provide a transcript to work on", UserWarning)
             return
         
-        ltrs = [ TinyTranscript(tr.internal_id,
-                                tr.unversioned_stable_id,
+        ltr = TinyTranscript(tr.internal_id,
+                                tr.stable_id,
                                 tr.version,
-                                tr.get_metadata('created_date'),
-                                tr.get_metadata('modified_date'),
-                                tr.slice.location.start,
-                                tr.slice.location.end,
-                                tr.slice.strand.value,
-                                tr.slice.location.length,
-                                seq_digest=hashlib.md5(tr.spliced_seq.encode('utf-8')).hexdigest(),
+                                tr.created_date,
+                                tr.modified_date,
+                                tr.start,
+                                tr.end,
+                                tr.strand,
+                                tr.length,
+                                seq_digest=hashlib.md5(tr.spliced_seq.encode('utf-8')).hexdigest() if tr.spliced_seq else None,
                                 biotype=tr.biotype,
-                                seq_region_name=tr.slice.name
-                                ) for tr in fat_transcripts ]
-        self._transcripts = ltrs
+                                seq_region_name=tr.get_slice().seq_region_name
+                                ) 
+        self._transcripts.append(ltr)
+        return ltr
         
 
-    def get_all_transcripts(self) -> list[TinyTranscript]:
+    def get_transcripts(self) -> list[TinyTranscript]:
         """
         Example     : for tr in tiny_gene.get_all_transcripts():
                         # do something with transcript

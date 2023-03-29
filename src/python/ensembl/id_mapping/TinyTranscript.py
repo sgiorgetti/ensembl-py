@@ -56,6 +56,8 @@
 from .TinyFeature import TinyFeature
 from .TinyExon import TinyExon
 from .TinyTranslation import TinyTranslation
+from ensembl.api.core.Strand import Strand
+from ensembl.api.core.Exon import Exon
 
 from typing import Union
 
@@ -75,7 +77,7 @@ class TinyTranscript(TinyFeature):
                  modified_date: int,
                  start: int,
                  end: int,
-                 strand: int,
+                 strand: Strand,
                  length: int,
                  seq_digest: Union[int, str],
                  translation: TinyTranslation = None,
@@ -87,9 +89,10 @@ class TinyTranscript(TinyFeature):
         self._end = end
         self._strand = strand
         self._length = length
-        self._seq_digest = seq_digest if isinstance(seq_digest, int) else int(seq_digest, 16)
+        # self._seq_digest = seq_digest if isinstance(seq_digest, int) else int(seq_digest, 16)
+        self._seq_digest = seq_digest
         self._translation = translation
-        self._exons = exons
+        self._exons = exons if exons else []
         self._biotype = biotype
         self._seq_region_name = seq_region_name
 
@@ -150,7 +153,7 @@ class TinyTranscript(TinyFeature):
     def strand(self) -> int:
         """
         Description : Getter for the transcript's strand coordinate.
-        Return type : Int
+        Return type : Strand
         Exceptions  : none
         Caller      : general
         Status      : At Risk
@@ -159,7 +162,7 @@ class TinyTranscript(TinyFeature):
         return self._strand
     
     @strand.setter
-    def strand(self, strand: int) -> None:
+    def strand(self, strand: Union[int, Strand]) -> None:
         """
         Arg[1]      : Int - the transcript's strand coordinate
         Description : Setter for the transcript's strand coordinate.
@@ -169,7 +172,9 @@ class TinyTranscript(TinyFeature):
         Status      : At Risk
                     : under development
         """
-        self._strand = strand
+        if not isinstance(strand, int) or not isinstance(strand, Strand):
+            raise ValueError(f'Strand must be int or Strand enum type.')
+        self._strand = Strand(strand) if isinstance(strand, int) else  strand
 
     @property
     def length(self) -> int:
@@ -258,6 +263,9 @@ class TinyTranscript(TinyFeature):
         if not isinstance(translation, TinyTranslation):
             raise ValueError(f'Need an ensembl.id_mapping.TinyTranslation object.')
         self._translation = translation
+
+    def set_translation(self, translation: TinyTranslation) -> None:
+        self.translation = translation
     
     @property
     def exons(self) -> list[TinyExon]:
@@ -338,7 +346,7 @@ class TinyTranscript(TinyFeature):
         """
         if not isinstance(translation, TinyTranslation):
             raise ValueError(f'Need an ensembl.id_mapping.TinyTranslation object.')
-        self.translation(translation)
+        self.translation = translation
 
     def add_exon(self, exon: TinyExon) -> None:
         """
@@ -368,5 +376,36 @@ class TinyTranscript(TinyFeature):
                     : under development
         """
         self.exons
+
+    def add_fat_exon(self, exon: Exon, need_project: bool) -> None:
+        """
+        Arg[1]      : ensembl.api.core.SplicedExon exon - the exon to add
+        Example     : tiny_transcript.add_fat_exon(exon)
+        Description : Adds an exon to this transcript.
+        Return type : TinyExon
+        Exceptions  : thrown on wrong or missing argument
+        Caller      : general
+        Status      : At Risk
+                    : under development
+        """
+        if not isinstance(exon, Exon):
+            raise ValueError(f'Need an ensembl.id_mapping.TinyExon object.')
+        
+        lex = TinyExon(exon.internal_id,
+                       exon.stable_id,
+                       exon.version,
+                       exon.created_date,
+                       exon.modified_date,
+                       exon.start,
+                       exon.end,
+                       exon.strand,
+                       exon._slice.seq_region_name,
+                       exon.coord_system_name,
+                       exon.coord_system_version,
+                       exon.get_slice().subseq(),
+                       exon.phase,
+                       need_project)
+        self._exons.append(lex)
+        return lex
     
     

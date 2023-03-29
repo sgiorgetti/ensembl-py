@@ -121,6 +121,10 @@ class Slice():
     def coord_system_name(self) -> str:
         return self._coord_system.name if self._coord_system else ''
     
+    @property
+    def coord_system_version(self) -> str:
+        return self._coord_system.version if self._coord_system else ''
+    
     def centrepoint(self) -> int:
         return (self._start + self._end)/2.0
 
@@ -130,9 +134,9 @@ class Slice():
             self._coord_system.name if self._coord_system else '',
             self._coord_system.version if self._coord_system else '',
             self._seq_region_name,
-            self._start,
-            self._end,
-            self._strand.value
+            str(self._start),
+            str(self._end),
+            str(self._strand.value)
         )
         return ':'.join(vals)
     
@@ -158,6 +162,9 @@ class Slice():
     
     def get_seq_region_id(self) -> int:
         return self._internal_id
+    
+    def subseq(self) -> str:
+        return 'NNN'
     
     
 

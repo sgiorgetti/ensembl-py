@@ -19,3 +19,4 @@ from .ExonAdaptor import *
 from .GeneAdaptor import *
 from .SliceAdaptor import *
 from .TranscriptAdaptor import *
+from .TranslationAdaptor import *

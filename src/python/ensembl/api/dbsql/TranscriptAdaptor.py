@@ -17,15 +17,19 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.engine.row import Row
 
 from ensembl.core.models import Transcript as TranscriptORM, TranscriptAttrib as TranscriptAttribORM, AttribType as AttribTypeORM, Gene as GeneORM
-from ensembl.core.models import Xref, Analysis
+from ensembl.core.models import Translation as TranslationORM, Xref, Analysis
 
 from typing import Union
 
 from ensembl.api.core import Transcript, Strand, Gene
 from ensembl.api.dbsql.SliceAdaptor import SliceAdaptor
 from ensembl.api.dbsql.BiotypeAdaptor import BiotypeAdaptor
+from ensembl.api.dbsql.ExonAdaptor import ExonAdaptor
+from ensembl.api.dbsql.TranslationAdaptor import TranslationAdaptor
 from enum import Enum
 import warnings
+
+from ensembl.api.dbsql.Utils import timeme
 
 __all__ = [ 'TranscriptAdaptor', 'TSLVERSION' ]
 
@@ -64,11 +68,10 @@ class TranscriptAdaptor():
         """
         if stable_id.find('.') > 0:
             (unversioned_stable_id, version) = stable_id.split('.')
+            version = int(version)
         else:
             unversioned_stable_id = stable_id
-            version = 0
-
-        int(version)
+            version = 0 
 
         res = (
             session.query(
@@ -127,11 +130,69 @@ class TranscriptAdaptor():
 
     
     @classmethod
-    def fetch_all_by_gene_id(cls, session: Session, gene_internal_id: int) -> tuple[Transcript]:
+    def fetch_by_internal_id(cls, session: Session, internal_id: int) -> Transcript:
+        """
+        Arg [1]    : Session session - the ORM session object to connect to the DB to
+        Arg [2]    : internal_id: int
+                     the internal id (dbID) of the transcript to retrieve
+        Example    : transcript = TranscriptAdaptor.fetch_by_internal_id(1234);
+        Description: Retrieves a transcript via its internal id (dbID).
+                     The transcript will be retrieved in its native coordinate system (i.e.
+                     in the coordinate system it is stored in the database). It may
+                     be converted to a different coordinate system through a call to
+                     transform() or transfer(). If the transcript is not found
+                     None is returned instead.
+        Returntype : ensembl.api.core.Transcript in native coordinates.
+        Exceptions : NoResultFound
+        Caller     : general
+        Status     : At Risk
+                   : under development
+        """
+        if internal_id is None:
+            return None
+
+        res = (
+            session.query(
+                TranscriptORM,
+                Bundle("Xref",
+                       Xref.dbprimary_acc,
+                       Xref.description
+                ),
+                Bundle("Analysis",
+                       Analysis.logic_name
+                )
+            )
+            .join(TranscriptORM.analysis)
+            .join(TranscriptORM.display_xref, isouter=True)
+            .filter(TranscriptORM.transcript_id == internal_id)
+            .filter(TranscriptORM.is_current == '1')
+            .first()
+        )
+
+        if not res:
+                raise NoResultFound(f'Could not find any transcript with {internal_id}.')
+        
+        transcript_attribs = (
+            session.query(TranscriptAttribORM, AttribTypeORM)
+            .join(TranscriptAttribORM.attribs)
+            .filter(TranscriptAttribORM.transcript_id == res.Transcript.transcript_id)
+            .all()
+        )
+        return cls._transcriptrow_to_transcript(session, res, transcript_attribs)
+
+    
+    @classmethod
+    @timeme
+    def fetch_all_by_gene_id(cls, session: Session, gene_internal_id: int,
+                             load_exons: bool = False, load_translation: bool = False) -> tuple[Transcript]:
         """
         Arg [1]    : Session session - the ORM session object to connect to the DB to
         Arg [2]    : int gene_internal_id
                      the gene internal id of the transcripts to retrieve
+        Arg [3]    : bool load_exons - default False
+                     flag to load the exons within the transcript object
+        Arg [4]    : bool load_translation - default False
+                     flag to load the translation within the transcript object
         Example    : transcript = TranscriptAdaptor.fetch_all_by_gene_id(1234);
         Description: Retrieves a transcript list via the related gene internal_id.
                      The transcripts will be retrieved in its native coordinate system (i.e.
@@ -173,6 +234,16 @@ class TranscriptAdaptor():
                 .all()
             )
             tr = cls._transcriptrow_to_transcript(session, tr_row, transcript_attribs)
+            if load_exons:
+                ee = ExonAdaptor.fetch_all_by_Transcript(session, tr)
+                if not ee:
+                    warnings.warn(f"Could not find exons for transcript {tr.stable_id}", UserWarning)
+                else:
+                    tr.set_exons(ee)
+            if load_translation and tr.biotype.biotype_group in ('coding', 'LRG'):
+                # The method adds already the translation to the transcript
+                # safe to discard the returned values
+                TranslationAdaptor.fetch_by_Transcript(session, tr)
             transcripts.append(tr)
 
         return tuple(transcripts)
@@ -181,6 +252,39 @@ class TranscriptAdaptor():
     @classmethod
     def fetch_all_by_gene(cls, session: Session, gene: Gene) -> tuple[Transcript]:
         return cls.fetch_all_by_gene_id(session, gene.internal_id)
+    
+
+    @classmethod
+    def fetch_by_translation_stable_id_version(cls, session: Session, transl_stable_id: str, transl_version: int) -> Transcript:
+        if not isinstance(transl_version, int):
+            return None
+        res = (
+            session.query(TranscriptORM.transcript_id)
+            .join(TranslationORM.transcript)
+            .filter(TranscriptORM.is_current == 1)
+            .filter(TranslationORM.stable_id == transl_stable_id)
+            .filter(TranslationORM.version == transl_version)
+            .first()
+        )
+        if not res:
+            return None
+        return cls.fetch_by_internal_id(res.Transcript.transcript_id)
+    
+
+    @classmethod
+    def fetch_by_translation_id(cls, session: Session, transl_internal_id: int) -> Transcript:
+        if not isinstance(transl_internal_id, int):
+            return None
+        res = (
+            session.query(TranscriptORM.transcript_id)
+            .join(TranslationORM.transcript)
+            .filter(TranscriptORM.is_current == 1)
+            .filter(TranslationORM.translation_id == transl_internal_id)
+            .first()
+        )
+        if not res:
+            return None
+        return cls.fetch_by_internal_id(res.Transcript.transcript_id)
 
 
     @classmethod
@@ -205,7 +309,8 @@ class TranscriptAdaptor():
             external_name=tr_row.Xref.dbprimary_acc,
             description=tr_row.Transcript.description,
             created_date=tr_row.Transcript.created_date,
-            modified_date=tr_row.Transcript.modified_date
+            modified_date=tr_row.Transcript.modified_date,
+            canonical_translation_id=tr_row.Transcript.canonical_translation_id
         )
 
         for ta in transcript_attribs:

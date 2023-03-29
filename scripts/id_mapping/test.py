@@ -1,5 +1,5 @@
 from ensembl.database.dbconnection import DBConnection
-from ensembl.api.dbsql import ExonAdaptor, SliceAdaptor, CoordSystemAdaptor, TranscriptAdaptor, AssemblyAdaptor, GeneAdaptor, BiotypeAdaptor
+from ensembl.api.dbsql import ExonAdaptor, SliceAdaptor, CoordSystemAdaptor, TranscriptAdaptor, AssemblyAdaptor, GeneAdaptor, BiotypeAdaptor, TranslationAdaptor
 from ensembl.core.models import Exon as ExonORM
 from ensembl.api.core import Exon, SplicedExon, Transcript, Gene, Assembly
 
@@ -130,9 +130,10 @@ def main3():
         for t in g.get_transcripts():
             print(f"\ttranscript {t.stable_id} - isCanonical {t.is_canonical()}")
 
+import timeit
 def main4():
-    dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/homo_sapiens_core_110_38')
-    # dbc = DBConnection('mysql://ensro@mysql-ens-mirror-1.ebi.ac.uk:4240/homo_sapiens_core_109_38')
+    # dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/homo_sapiens_core_110_38')
+    dbc = DBConnection('mysql://ensro@mysql-ens-mirror-1.ebi.ac.uk:4240/homo_sapiens_core_109_38')
     
     with dbc.session_scope() as session:
         # ss = SliceAdaptor._fetch_all_seq_regions_by_coord_system_id(session, 4)
@@ -141,12 +142,23 @@ def main4():
         # ss = SliceAdaptor.fetch_by_name(session, 'chromosome:GRCh38:MT:1:16569')
         # ss = SliceAdaptor.fetch_all(session, 'chromosome', 'GRCh38')
         # ss = BiotypeAdaptor.fetch_by_name_object_type(session, 'protein_coding', 'gene')
-        ss = BiotypeAdaptor.fetch_all_by_object_type(session, 'gene')
-        print(ss[0])
-        ss = BiotypeAdaptor.fetch_by_name_object_type(session, 'protein_coding', 'transcript')
-        print(ss)
-        ss = BiotypeAdaptor.fetch_all_by_object_type(session, 'gene')
-        print(ss[1])
+        # ss = BiotypeAdaptor.fetch_all_by_object_type(session, 'gene')
+
+        # cs_name = 'chromosome'
+        # ss = SliceAdaptor.fetch_all(session, cs_name)
+        # # ss = SliceAdaptor.fetch_all(session, cs_name, include_non_reference=True)
+        # print(f'Retrieved {len(ss)} slices for CS {cs_name}')
+        # e = ExonAdaptor.fetch_by_stable_id(session, 'ENSE00001544499')
+        # t = TranscriptAdaptor.fetch_by_stable_id_version(session, 'ENST00000389680', 2)
+        t = TranscriptAdaptor.fetch_by_stable_id_version(session, 'ENST00000641515', 2)
+        ee = ExonAdaptor.fetch_all_by_Transcript(session, t)
+        tl = TranslationAdaptor.fetch_by_transcript(session, t)
+        t.set_exons(ee)
+        print(f'{t} - {t.translation.internal_id}:{t.translation.stable_id}')
+        for e in t.get_exons():
+            print(f'\t{e}')
+        
+
 
 def main():
     # dbc = DBConnection('mysql://ensro@mysql-ens-core-prod-1.ebi.ac.uk:4524/sgiorgetti_homo_sapiens_core_109_38')
@@ -171,4 +183,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main4()

@@ -31,5 +31,9 @@ class Biotype():
     db_type: str = field(repr=False)
     attrib_type_id: int = field(repr=False, default=None)
 
+    @property
+    def type(self) -> str:
+        self.__type
+
 
 

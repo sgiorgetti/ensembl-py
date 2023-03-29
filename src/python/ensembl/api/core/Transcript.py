@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from . import SplicedExon, Slice, Feature, Strand, Biotype
+from .Translation import Translation
 from typing import Union
 
 
@@ -66,7 +67,7 @@ class Transcript(Feature):
                  created_date: str = None,
                  modified_date: str = None,
                  spliced_seq: str = None,
-
+                 canonical_translation_id: int = None
                 ) -> None:
         
 
@@ -88,6 +89,8 @@ class Transcript(Feature):
         self._is_current = is_current
         self._is_canonical = is_canonical
         self._spliced_seq = spliced_seq
+        self._translation = None
+        self._canonical_translation_id = canonical_translation_id
 
         self._external_name = external_name
         self._external_db = external_db
@@ -219,7 +222,26 @@ class Transcript(Feature):
     def description(self, value: str) -> None:
         self._description = value
 
+    @property
+    def canonical_translation_id(self) -> int:
+        return self._canonical_translation_id
 
+    # @property
+    # def length(self) -> int:
+    #     raise NotImplemented
+    
+    @property
+    def translation(self) -> Translation:
+        return self._translation
+
+    @translation.setter
+    def translation(self, value: Translation) -> None:
+        if not isinstance(value, Translation):
+            raise AttributeError(f'Provided value must be a Translation, instead of {type(value)}')
+        self._translation = value
+
+    def set_translation(self, tl: Translation) -> None:
+        self.translation = tl
 
     def get_exons(self) -> list[SplicedExon]:
         return self._exons
@@ -241,7 +263,7 @@ class Transcript(Feature):
             return self._attributes
         return tuple(att_code, self._attributes.get(att_code))
     
-    def add_attrib(self, code: str, value: str):
+    def add_attrib(self, code: str, value: str) -> None:
         self._attributes[code] = value
 
     def is_canonical(self) -> bool:
