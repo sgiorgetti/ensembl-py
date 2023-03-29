@@ -132,7 +132,8 @@ dmypy.json
 # VSCode config
 .vscode/
 
-# Output files
+# Output files/folders
 *.gff
 *.gff3
 *.gtf
+cache/
