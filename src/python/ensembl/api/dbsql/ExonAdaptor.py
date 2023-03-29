@@ -24,7 +24,7 @@ from typing import Union
 from ensembl.api.core import Exon, SplicedExon, Slice, Strand, Transcript
 from ensembl.api.dbsql.SliceAdaptor import SliceAdaptor
 
-from ensembl.api.dbsql.Utils import timeme
+# from ensembl.api.dbsql.Utils import timeme
 
 __all__ = [ 'ExonAdaptor' ]
 
@@ -87,7 +87,6 @@ class ExonAdaptor():
         return cls._exonrow_to_exon(slice, res)
 
     @classmethod
-    @timeme
     def fetch_all_by_Transcript(cls, session: Session, transcript: Transcript) -> list[SplicedExon]:
         """
         Arg [1]    : sqlalchemy.orm.Session session

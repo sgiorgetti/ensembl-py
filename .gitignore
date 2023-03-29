@@ -137,3 +137,4 @@ dmypy.json
 *.gff3
 *.gtf
 cache/
+*.ser

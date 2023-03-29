@@ -29,7 +29,7 @@ from ensembl.api.dbsql.TranslationAdaptor import TranslationAdaptor
 from enum import Enum
 import warnings
 
-from ensembl.api.dbsql.Utils import timeme
+# from ensembl.api.dbsql.Utils import timeme
 
 __all__ = [ 'TranscriptAdaptor', 'TSLVERSION' ]
 
@@ -182,7 +182,6 @@ class TranscriptAdaptor():
 
     
     @classmethod
-    @timeme
     def fetch_all_by_gene_id(cls, session: Session, gene_internal_id: int,
                              load_exons: bool = False, load_translation: bool = False) -> tuple[Transcript]:
         """

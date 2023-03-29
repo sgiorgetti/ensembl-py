@@ -1,3 +1,17 @@
+# See the NOTICE file distributed with this work for additional information
+# regarding copyright ownership.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session, Bundle, aliased
 
@@ -6,7 +20,6 @@ from ensembl.core.models import SeqRegionAttrib as SeqRegionAttribORM
 
 from typing import Optional
 
-from ensembl.api.dbsql.Exceptions import ArgumentError
 from ensembl.api.dbsql.CoordSystemAdaptor import CoordSystemAdaptor
 from ensembl.api.core.Strand import Strand
 from ensembl.api.core import Slice, RegionTopology
@@ -56,7 +69,7 @@ class SliceAdaptor():
                    : under development
         """
         if not session:
-            raise ArgumentError()
+            raise ValueError()
         
         slices = []
         if not start:
@@ -65,9 +78,9 @@ class SliceAdaptor():
         if end:
             end = int(end)
         if not seq_region_name:
-            raise ArgumentError('seq_region_name argument is required')
+            raise ValueError('seq_region_name argument is required')
         if not coord_system_name:
-            raise ArgumentError('coord_system_name argument is required')
+            raise ValueError('coord_system_name argument is required')
         
         subq = (select(SeqRegionAttribORM.seq_region_id, SeqRegionAttribORM.value)
                 .join(AttribTypeORM, SeqRegionAttribORM.attrib_type_id == AttribTypeORM.attrib_type_id)
@@ -127,10 +140,10 @@ class SliceAdaptor():
                                strand: Strand = Strand.FORWARD
                                ) -> Slice:
         if not session:
-            raise ArgumentError()
+            raise ValueError()
         
         if not isinstance(seq_region_id, int) or seq_region_id <= 0:
-            raise ArgumentError()
+            raise ValueError()
 
         subq = (select(SeqRegionAttribORM.seq_region_id, SeqRegionAttribORM.value)
                 .join(AttribTypeORM, SeqRegionAttribORM.attrib_type_id == AttribTypeORM.attrib_type_id)
@@ -199,12 +212,12 @@ class SliceAdaptor():
                    : under development
         """
         if not ':' in name:
-            raise ArgumentError('Malfomred name for Slice')
+            raise ValueError('Malfomred name for Slice')
         
         array = name.split(':')
 
         if len(array) < 3 or len(array) > 6:
-            raise ArgumentError(
+            raise ValueError(
                 f'Malfomred slice name [{name}]. Format is "coord_system:version:name:start:end:strand"')
         
         # make len(array) = 6, adding None as appropriate

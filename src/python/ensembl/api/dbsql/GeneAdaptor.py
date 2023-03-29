@@ -1,3 +1,17 @@
+# See the NOTICE file distributed with this work for additional information
+# regarding copyright ownership.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session, Bundle
 from sqlalchemy.orm.exc import NoResultFound
@@ -15,7 +29,7 @@ from ensembl.api.dbsql.TranscriptAdaptor import TranscriptAdaptor
 from ensembl.api.dbsql.BiotypeAdaptor import BiotypeAdaptor
 
 import warnings
-from ensembl.api.dbsql.Utils import timeme
+# from ensembl.api.dbsql.Utils import timeme
 
 __all__ = [ 'GeneAdaptor' ]
 
@@ -99,7 +113,6 @@ class GeneAdaptor():
         return gene
     
     @classmethod
-    @timeme
     def fetch_all_by_Slice(cls,
                            session: Session,
                            slice: Slice,
@@ -203,7 +216,6 @@ class GeneAdaptor():
         
 
     @classmethod
-    @timeme
     def fetch_all(cls, session: Session,
                   species_id: int = 1,
                   logic_name: str = None,

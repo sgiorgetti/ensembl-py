@@ -81,6 +81,7 @@ class Cache():
 
 
     @classmethod
+    @timeme
     def build_cache_by_slice(cls, src_session: Session, tgt_session: Session, dbtype: str, slice_name: str) -> tuple[int,str]:
         """
         Arg[1]      : String dbtype - db type (source|target)
@@ -130,7 +131,7 @@ class Cache():
             need_project = False
 
         # build cache
-        mytype = f'{mytype}.{slice.seq_region_name}'
+        mytype = f'{mytype}.{slice.name()}'
         num_genes = cls.build_cache_from_genes( mytype, genes, need_project )
         
         # write cache to file, then flush cache to reclaim memory
@@ -720,7 +721,7 @@ def main():
         # num = Cache.build_cache_from_genes('source', genes, False)
         # print(num)
         slice_name = 'chromosome:GRCh38:13:32315086:32400268:1'
-        slice_name = 'chromosome:GRCh38:13:20110086:33000268:1'
+        slice_name = 'chromosome:GRCh38:20:1:64444167:1'
         # slice_name = 'chromosome:GRCh38:MT:1:16569'
         (num_genes, bytesize) = Cache.build_cache_by_slice(src_session, tgt_session, 'source', slice_name)
         print(f'Dumped {num_genes} genes in a file {bytesize} in size')
