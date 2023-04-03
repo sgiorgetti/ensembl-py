@@ -228,7 +228,7 @@ class Transcript(Feature):
 
     # @property
     # def length(self) -> int:
-    #     raise NotImplemented
+    #     raise NotImplementedError
     
     @property
     def translation(self) -> Translation:

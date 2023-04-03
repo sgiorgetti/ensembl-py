@@ -17,6 +17,8 @@ from .BiotypeAdaptor import *
 from .CoordSystemAdaptor import *
 from .ExonAdaptor import *
 from .GeneAdaptor import *
+from .MetaAdaptor import *
+from .SequenceAdaptor import *
 from .SliceAdaptor import *
 from .TranscriptAdaptor import *
 from .TranslationAdaptor import *

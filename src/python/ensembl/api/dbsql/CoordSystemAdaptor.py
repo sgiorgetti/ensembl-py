@@ -18,8 +18,12 @@ from sqlalchemy.orm import Session
 from ensembl.core.models import CoordSystem as CoordSystemORM, Meta as MetaORM
 
 from typing import Optional
+import re
 
 from ensembl.api.core.Assembly import CoordSystem
+from ensembl.api.dbsql.MetaAdaptor import MetaAdaptor
+
+from functools import lru_cache
 
 import warnings
 
@@ -38,6 +42,9 @@ class CoordSystemAdaptor():
     coordinate system does not have a version an empty string ('') is used
     instead.
     """
+
+    _top_level = None
+    _mapping_paths = {}
     
     @classmethod
     def fetch_all(cls, session: Session, species_id: int = None) -> list[CoordSystem]:
@@ -225,8 +232,8 @@ class CoordSystemAdaptor():
 
         return CoordSystem(cs_row.name, cs_row.version, cs_row.rank, toplevel, seqlevel, default, cs_row.species_id, cs_row.coord_system_id)
 
-    
     @classmethod
+    @lru_cache(maxsize=2)
     def fetch_sequence_level(cls, session: Session) -> CoordSystem:
         """
         Arg [1]    : session: Session
@@ -413,4 +420,131 @@ class CoordSystemAdaptor():
             cs_list.append(cs)
 
         return cs_list
-       
+    
+
+    @classmethod
+    def _cache_mapping_paths(cls, session: Session) -> None:
+        mapping_paths = {}
+
+        MetaAdaptor.fromSession(session)
+        meta_maps = MetaAdaptor.fetch_meta_value_by_key('assembly.mapping')
+        for map_path in meta_maps:
+            cs_strings = re.split(r'[|#]', map_path)
+            if len(cs_strings) < 2:
+                warnings.warn(f'Incorrectly formatted assembly.mapping value in meta table: {map_path}', UserWarning)
+                continue
+            
+            def _inner_fetch_cs(cs_strings):
+                cs_list = []
+                for cs_str in cs_strings:
+                    (cs_name, _,cs_version) = cs_str.partition(':')
+                    cs = CoordSystemAdaptor.fetch_by_name(session, cs_name, cs_version)
+                    if not cs:
+                        warnings.warn(f'Unknown coordinate system specified in meta table: {cs_str}', UserWarning)
+                        return None
+                    cs_list.append(cs)
+                return cs_list
+            
+            coord_systems = _inner_fetch_cs(cs_strings)
+            if coord_systems is None:
+                continue
+
+            # If the delimiter is a '#' we want a special case, multiple parts
+            # of the same component map to the same assembly part.  As this
+            # looks like the "long" mapping, we just make the path a bit longer
+            # :-)
+            if '#' in map_path and len(coord_systems) == 2:
+                coord_systems.insert(1, None)
+            cs1 = coord_systems[0]
+            cs2 = coord_systems[-1]
+
+            key1 = f'{cs1.name}:{cs1.version}' if cs1.version else cs1.name
+            key2 = f'{cs2.name}:{cs2.version}' if cs2.version else cs2.name
+
+            if mapping_paths.get(f'{key1}|{key2}'):
+                warnings.warn(f"""Meta table specifies multiple mapping paths between 
+                    coord systems {key1} and {key2}.\n
+                    Choosing shorter path arbitrarily.
+                    """, UserWarning)
+                if len(mapping_paths.get(f'{key1}|{key2}')) < len(coord_systems):
+                    continue
+
+            mapping_paths[f'{key1}|{key2}'] = coord_systems
+
+        # Create the pseudo coord system 'toplevel' and cache it so that only
+        # one of these is created for each database.
+        cls._top_level = CoordSystem('toplevel', top_level=True) 
+        cls._mapping_paths = mapping_paths # set/cache mapping paths from DB
+
+
+    @classmethod
+    def get_mapping_path(cls, session: Session, cs1: CoordSystem, cs2: CoordSystem) -> tuple[CoordSystem]:
+        if not session:
+            raise ValueError(f'Must have a session to connect to a DB to')
+        if not cs1 or not cs2:
+            raise ValueError(f'Two ensembl.api.core.CoordSystem arguments expected.')
+        
+        if not cls._mapping_paths:
+            cls._cache_mapping_paths(session)
+
+        key1 = f'{cs1.name}:{cs1.version}' if cs1.version else cs1.name
+        key2 = f'{cs2.name}:{cs2.version}' if cs2.version else cs2.name
+
+        path = cls._mapping_paths.get(f'{key1}|{key2}')
+        if path:
+            return path
+        
+        path = cls._mapping_paths.get(f'{key2}|{key1}')
+        if path:
+            return path
+        
+        # No path was explicitly defined, but we might be able to guess a
+        # suitable path.  We only guess for missing 2 step paths.
+        mid1 = {}
+        mid2 = {}
+        for p in cls._mapping_paths.values():
+            if len(p) != 2:
+                continue
+
+            match = None
+            if p[0] == cs1:
+                match = 1
+            elif p[1] == cs1:
+                match = 0
+                
+            if match is not None:
+                mid = p[match]
+                midkey = f'{mid.name}:{mid.version}' if mid.version else mid.name
+                # is the same cs mapped to by other cs?
+                if mid2.get(midkey):
+                    pp = (cs1, mid, cs2)
+                    cls._mapping_paths[f'{key1}|{key2}'] = pp
+                    warnings.warn(f"""Using implicit mapping path between '{key1}' and '{key2}' coord systems.\n
+                    An explicit 'assembly.mapping' entry should be added to the meta table.\n
+                    Example: '{key1}|{midkey}|{key2}'\n
+                    """, UserWarning)
+                    return pp
+                else:
+                    mid1[midkey] = mid
+            
+            match = None
+            if p[0] == cs2:
+                match = 1
+            elif p[1] == cs2:
+                match = 0
+
+            if match is not None:
+                mid = p[match]
+                midkey = f'{mid.name}:{mid.version}' if mid.version else mid.name
+                # is the same cs mapped to by other cs?
+                if mid1.get(midkey):
+                    pp = (cs2, mid, cs1)
+                    cls._mapping_paths[f'{key2}|{key1}'] = pp
+                    warnings.warn(f"""Using implicit mapping path between '{key1}' and '{key2}' coord systems.\n
+                    An explicit 'assembly.mapping' entry should be added to the meta table.\n
+                    Example: '{key1}|{midkey}|{key2}'\n
+                    """, UserWarning)
+                    return pp
+                else:
+                    mid2[midkey] = mid
+        return ()

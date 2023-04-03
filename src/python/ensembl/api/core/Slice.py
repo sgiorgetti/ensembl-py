@@ -17,6 +17,7 @@ from ensembl.api.core.Strand import Strand
 
 import warnings
 from enum import Enum
+from copy import copy
 
 __all__ = [ 'Slice', 'RegionCode', 'RegionTopology' ]
 
@@ -110,12 +111,20 @@ class Slice():
         return self._seq_region_length
     
     @property
+    def seq_region_id(self) -> int:
+        return self._internal_id
+    
+    @property
+    def internal_id(self) -> int:
+        return self._internal_id
+    
+    @property
     def coord_system(self) -> CoordSystem:
         return self._coord_system
     
     @property
     def source(self):
-        raise NotImplemented()
+        raise NotImplementedError()
     
     @property
     def coord_system_name(self) -> str:
@@ -147,10 +156,10 @@ class Slice():
         return len
     
     def is_reference(self):
-        raise NotImplemented()
+        raise NotImplementedError()
     
     def is_toplevel(self):
-        raise NotImplemented()
+        raise NotImplementedError()
     
     def is_circular(self) -> bool:
         if self._topology == RegionTopology.CIRCULAR:
@@ -158,13 +167,92 @@ class Slice():
         return False
     
     def get_all_genes(self):
-        raise NotImplemented()
-    
-    def get_seq_region_id(self) -> int:
-        return self._internal_id
+        raise NotImplementedError()
     
     def subseq(self) -> str:
         return 'NNN'
+    
+
+    # This can be simplified, using Pythonic constructs
+    def _constrain_to_region(self) -> tuple:
+        #if the slice has negative coordinates or coordinates exceeding the
+        #exceeding length of the sequence region we want to shrink the slice to
+        #the defined region
+        if self._start > self._seq_region_length or self._end < 1:
+            return ()
+
+        right_contract = 0
+        left_contract  = 0
+        if self._end > self._seq_region_length:
+            right_contract = self._seq_region_length - self._end
+        if self._start < 1:
+            left_contract = self._start - 1
+        
+        new_slice = self
+        if left_contract or right_contract:
+            if self._strand == Strand.FORWARD:
+                (new_slice, tpref, fpref) = self.expand(left_contract, right_contract)
+            elif self._strand == Strand.REVERSE:
+                (new_slice, tpref, fpref) = self.expand(right_contract, left_contract)
+
+        return (1-left_contract, self.length()+right_contract, new_slice)
+        # return [bless [1-$left_contract, $self->length()+$right_contract,
+        #                 $new_slice], "Bio::EnsEMBL::ProjectionSegment" ];
+
+
+    def expand(self,
+               five_prime_shift: int = 0,
+               three_prime_shift: int = 0,
+               force_expand: bool = False
+               ) -> tuple:
+
+        if self._seq:
+            warnings.warn(f"Cannot expand a slice which has a manually attached sequence.", UserWarning)
+            return None
+        
+        if abs(five_prime_shift) + abs(three_prime_shift) == 0:
+            warnings.warn(f"5' and 3' shifts are zer. Nothing to do.", UserWarning)
+            return self
+
+        sshift = five_prime_shift if self._strand == Strand.FORWARD else three_prime_shift
+        eshift = three_prime_shift if self._strand == Strand.FORWARD else five_prime_shift
+
+        new_start = self._start - sshift
+        new_end   = self._end + eshift
+
+        # Wrap around on circular slices
+        if self.is_circular():
+            new_start %= self._seq_region_length
+            new_end %= self._seq_region_length
+
+        if new_start > new_end and not self.is_circular():
+            if force_expand:
+                # Apply max possible shift, if force_expand is set
+                if sshift < 0:
+                # if we are contracting the slice from the start - move the
+                # start just before the end
+                    new_start = new_end - 1
+                    sshift    = self._start - new_start
+
+                # if the slice still has a negative length - try to move the
+                # end
+                if new_start > new_end and eshift < 0:
+                    new_end = new_start + 1
+                    eshift  = new_end - self._end
+
+                # return the values by which the primes were actually shifted
+                tpref = eshift if self._strand == Strand.FORWARD else sshift
+                fpref = sshift if self._strand == Strand.FORWARD  else eshift
+            
+            if new_start > new_end:
+                raise Exception(f'Slice start cannot be greater than slice end')
+
+        #fastest way to copy a slice is to do a shallow hash copy
+        new_slice = copy(self)
+        new_slice.start = int(new_start)
+        new_slice.end   = int(new_end)
+
+        return (new_slice, tpref, fpref)
     
     
 

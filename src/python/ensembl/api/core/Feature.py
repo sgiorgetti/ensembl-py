@@ -76,7 +76,7 @@ class Feature():
         if (self.start == __o.start 
             and self.end == __o.end
             and self.strand == __o.strand
-            and self._slice.get_seq_region_id() == __o._slice.get_seq_region_id()
+            and self._slice.seq_region_id == __o._slice.seq_region_id
             and self.analysis == __o.analysis):
             return True
         else:
@@ -180,16 +180,16 @@ class Feature():
 
 
     def transform(self, cs_name, cs_version, to_slice):
-        raise NotImplemented()
+        raise NotImplementedError()
     
     def transfer(self, to_slice):
-        raise NotImplemented()
+        raise NotImplementedError()
     
     def project_to_slice(self, to_slice):
-        raise NotImplemented()
+        raise NotImplementedError()
     
     def project(self, cs_name, cs_version):
-        raise NotImplemented()
+        raise NotImplementedError()
     
     def feature_slice(self) -> Slice:
         if not self._slice:
@@ -239,7 +239,7 @@ class Feature():
 
     # sub seq
     def seq(self):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def get_summary(self) -> dict:
         summary = {}

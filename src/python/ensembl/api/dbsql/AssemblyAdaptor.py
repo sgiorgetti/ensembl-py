@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sqlalchemy import and_
+from sqlalchemy import and_, select, func
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
 
-from ensembl.core.models import CoordSystem as CoordSystemORM
-from ensembl.core.models import Meta as MetaORM
+from ensembl.core.models import CoordSystem as CoordSystemORM, Meta as MetaORM
+from ensembl.core.models import AssemblyException as AssemblyExceptionORM, SeqRegion as SeqRegionORM
 
 from ensembl.api.dbsql.CoordSystemAdaptor import CoordSystemAdaptor
 
@@ -106,3 +106,18 @@ class AssemblyAdaptor():
                         last_geneset_update,
                         assembly_date,
                         is_default=True)
+    
+
+    @classmethod
+    def check_assembly_exceptions(cls, session: Session, species_id: int = 1) -> bool:
+        if species_id < 0 or not isinstance(species_id, int):
+            raise ValueError(f'Species_id must be a positive integer or None (defaults to 1).')
+        stmt = (select(func.count(SeqRegionORM.seq_region_id).label('cnt'))
+                .join(AssemblyExceptionORM.seq_region)
+                .join(SeqRegionORM.coord_system)
+                .where(CoordSystemORM.species_id == species_id)
+                )
+        res = session.scalars(stmt).first()
+        if res > 0:
+            return True
+        return False

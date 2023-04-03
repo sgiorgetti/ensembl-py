@@ -21,8 +21,9 @@ from ensembl.core.models import SeqRegionAttrib as SeqRegionAttribORM
 from typing import Optional
 
 from ensembl.api.dbsql.CoordSystemAdaptor import CoordSystemAdaptor
+from ensembl.api.dbsql.AssemblyAdaptor import AssemblyAdaptor
 from ensembl.api.core.Strand import Strand
-from ensembl.api.core import Slice, RegionTopology
+from ensembl.api.core import Slice, RegionTopology, CoordSystem
 
 import warnings
 
@@ -459,17 +460,99 @@ class SliceAdaptor():
             return res
         return ""
     
+
     # @classmethod
-    # def _build_exception_cache(cls, session: Session, species_id: int) -> None:
-    #     # build up a cache of the entire assembly exception table
-    #     # it should be small anyway
-    #     stmt = (select(AssemblyExceptionORM)
-    #         .join(SeqRegionORM, SeqRegionORM.seq_region_id == AssemblyExceptionORM.seq_region_id)
-    #         .join(CoordSystemORM, CoordSystemORM.coord_system_id == SeqRegionORM.coord_system_id)
-    #         .where(CoordSystemORM.species_id == species_id)
-    #     )
-    #     res = session.scalars(stmt).all()
-    #     myasm = []
-    #     for r in res:
-    #         myasm.append(r)
-    #     cls._asm_exc_cache = tuple(myasm)
+    # def fetch_normalized_slice_projection(cls, session: Session, slice: Slice) -> tuple[int,int,Slice]:
+    #     if not session:
+    #         raise ValueError(f'Need a session to a DB to work')
+    #     if not slice:
+    #         raise ValueError(f'Need a slice to project')
+        
+    #     if AssemblyAdaptor.check_assembly_exceptions(session, species_id=1):
+    #         raise NotImplementedError(f'Assembly exceptions found in DB {session.connection().engine.url}')
+        
+    #     return (1, slice.length(), slice)
+        
+
+
+
+    @classmethod
+    def project(cls, session: Session, slice: Slice, target_cs: CoordSystem) -> tuple:
+        if not session:
+            raise ValueError(f'Need a session to a DB to work')
+        if not target_cs or not isinstance(target_cs, CoordSystem):
+            raise ValueError(f'Need a coordinate system to project the slice to')
+        if not slice:
+            warnings.warn(f'Need a slice to start from', UserWarning)
+            return None
+        if not slice.coord_system:
+            warnings.warn(f'Cannot project slice {slice.name()} without an attached coordinate system', UserWarning)
+            return None
+        
+        slice_cs = slice.coord_system
+        
+        # no mapping is needed if the requested coord system is the one we are in
+        # but we do need to check if some of the slice is outside of defined regions
+        if slice_cs == target_cs:
+            (st, en, new_slice) = slice._constrain_to_region()
+            return ((st, en, new_slice),)
+        
+        # $normal_slice = $normal_slice_proj->[2]; this is the slice
+
+        
+        raise NotImplementedError()
+        
+        # asm_mapper = $asma->fetch_by_CoordSystems($slice_cs, $cs);
+        
+    #     my @coords = $asm_mapper->map($normal_slice->seq_region_name(),
+	# 			  $normal_slice->start(),
+	# 			  $normal_slice->end(),
+	# 			  $normal_slice->strand(),
+	# 			  $slice_cs, undef, undef, 1);
+        
+    #     foreach my $coord (@coords) {
+    #   my $original = $coord->{original};
+    #   my $mapped = $coord->{mapped};
+
+    #   # skip gaps
+    #   next unless $mapped->isa('Bio::EnsEMBL::Mapper::Coordinate');
+
+    #   my $mapped_start = $mapped->start();
+    #   my $mapped_end = $mapped->end();
+    #   my ($current_start, $current_end);
+    #   if ($self->strand == 1) {
+	# $current_start = $original->start() - $self->start + 1;
+	# $current_end = $original->end() - $self->start + 1;
+    #   } else {
+	# $current_start = $self->end() - $original->end + 1;
+	# $current_end = $self->end - $original->start + 1;
+    #   }
+      
+    #   my $coord_cs = $mapped->coord_system();
+
+    #   # If the normalised projection just ended up mapping to the
+    #   # same coordinate system we were already in then we should just
+    #   # return the original region.  This can happen for example, if we
+    #   # were on a PAR region on Y which refered to X and a projection to
+    #   # 'toplevel' was requested.
+    #   if($coord_cs->equals($slice_cs)) {
+	# # trim off regions which are not defined
+	# return $self->_constrain_to_region();
+    #   }
+    #   #create slices for the mapped-to coord system
+    #   my $slice = $slice_adaptor->fetch_by_seq_region_id($mapped->id(),
+	# 						 $mapped_start,
+	# 						 $mapped_end,
+	# 						 $mapped->strand());
+
+    #   if ($current_end > $slice->seq_region_length() && $slice->is_circular ) {
+	# $current_end -= $slice->seq_region_length();
+    #   }
+      
+    #   push @projection, bless([$current_start, $current_end, $slice],
+	# 		      "Bio::EnsEMBL::ProjectionSegment");
+      
+    # }
+
+
+   

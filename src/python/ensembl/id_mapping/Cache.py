@@ -328,7 +328,7 @@ class Cache():
                     if need_project:
                         #  exon.project (highest CCS)
                         # TO DO
-                        raise NotImplemented
+                        raise NotImplementedError()
 
                     cls.add( 'exons_by_id', mytype, exon.internal_id, lex )
                     cls.add_list( 'transcripts_by_exon_id', mytype, exon.internal_id, ltr )
@@ -725,5 +725,6 @@ def main():
         # slice_name = 'chromosome:GRCh38:MT:1:16569'
         (num_genes, bytesize) = Cache.build_cache_by_slice(src_session, tgt_session, 'source', slice_name)
         print(f'Dumped {num_genes} genes in a file {bytesize} in size')
+        
 if __name__ == '__main__':
     main()
