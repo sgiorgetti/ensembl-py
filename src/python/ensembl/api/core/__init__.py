@@ -14,6 +14,7 @@
 """API core module"""
 
 from .Assembly import *
+from .AssemblyMapper import *
 from .Biotype import *
 from .Exon import *
 from .Feature import *

@@ -426,8 +426,7 @@ class CoordSystemAdaptor():
     def _cache_mapping_paths(cls, session: Session) -> None:
         mapping_paths = {}
 
-        MetaAdaptor.fromSession(session)
-        meta_maps = MetaAdaptor.fetch_meta_value_by_key('assembly.mapping')
+        meta_maps = MetaAdaptor.fetch_meta_value_by_key(session, 'assembly.mapping')
         for map_path in meta_maps:
             cs_strings = re.split(r'[|#]', map_path)
             if len(cs_strings) < 2:
@@ -453,8 +452,12 @@ class CoordSystemAdaptor():
             # of the same component map to the same assembly part.  As this
             # looks like the "long" mapping, we just make the path a bit longer
             # :-)
+            # SG !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            # SG - commenting this, as it is unclear!!!
+            # SG !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             if '#' in map_path and len(coord_systems) == 2:
-                coord_systems.insert(1, None)
+                # coord_systems.insert(1, None)
+                pass
             cs1 = coord_systems[0]
             cs2 = coord_systems[-1]
 

@@ -134,7 +134,6 @@ class SequenceAdaptor():
         gap = slice.length() - len(seq)
         seq += 'N' * gap if gap else ''
         
-        # self._rna_edits_cache ????
         if self._rna_edits_cache and self._rna_edits_cache.get(slice.seq_region_id):
             # $self->_rna_edit($slice,\$seq);
             seq = self._rna_edit(slice, seq)
@@ -315,11 +314,11 @@ import time
 # st = time.process_time()
 
 def main():
-    # dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/homo_sapiens_core_110_38')
-    dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/bos_taurus_core_110_12')
+    dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/homo_sapiens_core_110_38')
+    # dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/bos_taurus_core_110_12')
     with dbc.session_scope() as session:
-        # slice_name = 'chromosome:GRCh38:13:32315086:32400268:1'
-        slice_name = 'primary_assembly:ARS-UCD1.2:7:16782097:16851987:-1'
+        slice_name = 'chromosome:GRCh38:13:32315086:32400268:1'
+        # slice_name = 'primary_assembly:ARS-UCD1.2:7:16782097:16851987:-1'
         slice = SliceAdaptor.fetch_by_name(session, slice_name)
         sa = SequenceAdaptor(session)
         bioseq = sa.fetch_by_Slice_start_end_strand(slice, 

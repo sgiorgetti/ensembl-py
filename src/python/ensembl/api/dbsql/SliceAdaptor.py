@@ -21,9 +21,9 @@ from ensembl.core.models import SeqRegionAttrib as SeqRegionAttribORM
 from typing import Optional
 
 from ensembl.api.dbsql.CoordSystemAdaptor import CoordSystemAdaptor
-from ensembl.api.dbsql.AssemblyAdaptor import AssemblyAdaptor
+from ensembl.api.dbsql.AssemblyMapperAdaptor import AssemblyMapperAdaptor
 from ensembl.api.core.Strand import Strand
-from ensembl.api.core import Slice, RegionTopology, CoordSystem
+from ensembl.api.core import Slice, RegionTopology, CoordSystem, Feature
 
 import warnings
 
@@ -41,7 +41,7 @@ class SliceAdaptor():
                             version: Optional[str] = None, # this is Assembly name
                             start: int = 1,
                             end: Optional[int] = None,
-                            strand: int = 1
+                            strand: Strand = Strand.FORWARD
                             ) -> list[Slice]:
         """
         Arg [1]    : Session session
@@ -56,7 +56,7 @@ class SliceAdaptor():
             the seq_region start position
         Arg [6]    : int end
             the seq_region end position
-        Arg [7]    : int strand
+        Arg [7]    : Strand strand
             the seq_region strand +1 forward, -1 reverse
 
         Example    : region = region_adaptor.fetch_by_seq_region( session, 'X', 'chromosome' );
@@ -113,7 +113,7 @@ class SliceAdaptor():
         
         for row in rows:
             cs = CoordSystemAdaptor.fetch_by_dbID(session, row.SeqRegion.coord_system_id)
-            strand = Strand(strand) if strand else Strand.UNDEFINED
+            strand = strand if strand else Strand.FORWARD
             topology = 'CIRCULAR' if cls._is_circular(session, row.SRAttrCircular.value) else 'LINEAR'
             s = Slice(
                 cs,
@@ -132,6 +132,7 @@ class SliceAdaptor():
 
         return slices
     
+
     @classmethod
     def fetch_by_seq_region_id(cls, 
                                session: Session,
@@ -230,7 +231,7 @@ class SliceAdaptor():
                                        version=array[1],
                                        start=array[3],
                                        end=array[4],
-                                       strand=Strand(int(array[5]))
+                                       strand=Strand(int(array[5])) if array[5] else None
                                        )
         if len(sl) == 1:
             return sl[0]
@@ -369,6 +370,90 @@ class SliceAdaptor():
                             end,
                             strand)
 
+    
+    @classmethod
+    def project(cls, session: Session, slice: Slice, target_cs: CoordSystem) -> tuple:
+        if not session:
+            raise ValueError(f'Need a session to a DB to work')
+        if not target_cs or not isinstance(target_cs, CoordSystem):
+            raise ValueError(f'Need a coordinate system to project the slice to')
+        if not slice:
+            warnings.warn(f'Need a slice to start from', UserWarning)
+            return None
+        if not slice.coord_system:
+            warnings.warn(f'Cannot project slice {slice.name()} without an attached coordinate system', UserWarning)
+            return None
+        
+        slice_cs = slice.coord_system
+        
+        # no mapping is needed if the requested coord system is the one we are in
+        # but we do need to check if some of the slice is outside of defined regions
+        if slice_cs == target_cs:
+            (st, en, new_slice) = slice._constrain_to_region()
+            return ((st, en, new_slice),)
+        
+        # $normal_slice = $normal_slice_proj->[2]; this is the slice
+        ama = AssemblyMapperAdaptor(session, slice_cs, target_cs)
+        asm_mapper = ama.fetch_by_CoordSystems(load_mappings=True)
+        
+        return asm_mapper.map(slice)
+
+    
+    @classmethod
+    def fetch_by_feature(cls, session: Session, feat: Feature, size: int = 100) -> Slice:
+        """
+        Arg [1]    : session: Session - sqlalchemy.orm.Session object to connect to DBs
+        Arg [2]    : feat: Feature - The feature to fetch the slice around
+        Arg [3]    : size: int - he desired number of flanking basepairs around the feature.
+                     The size may also be provided as a percentage of the feature 
+                     size such as 200% or 100%.
+        Description: Retrieves a slice around a specific feature.  All this really
+                     does is return a resized version of the slice that the feature
+                     is already on. Note that slices returned from this method
+                     are always on the forward strand of the seq_region regardless of
+                     the strandedness of the feature passed in.
+        Returntype : ensembl.api.core.Slice
+        Exceptions : raise if no session is provided
+                     raise if the feature does not have an attached slice
+                     raise if feature argument is not provided
+                     raise if size argument is less than 100, if provided
+        Caller     : general
+        Status     : At Risk
+                   : under development
+        """
+        if not session or not feat:
+            raise ValueError(f'Missing argument')
+        if not isinstance(feat, Feature):
+            raise ValueError(f'Expected feature object. Got instead {type(feat)}')
+        if not feat.get_slice() or not isinstance(feat.get_slice(), Slice):
+            raise ValueError(f'Feature must be attached to a valid slice.')
+        if size is not None and size < 100:
+            raise ValueError(f'Size must be interger greater than 100')
+        size = int(size)
+
+        feat_slice = feat.get_slice()
+        fstart = feat.start
+        fend = feat.end
+        #convert the feature slice coordinates to seq_region coordinates
+        if feat_slice.strand == Strand.REVERSE:
+            tmp = fstart
+            fstart = feat_slice.end - fend + 1
+            fend = feat_slice.end - tmp + 1
+        else:
+            fstart += feat_slice.start - 1
+            fend += feat_slice.start - 1
+
+        size = int( (size-100)/200 * (fend-fstart+1) )
+        
+        return Slice(
+            feat_slice.coord_system,
+            feat_slice.seq_region_name,
+            feat_slice.seq_region_length,
+            fstart - size,
+            fend + size,
+            Strand.FORWARD
+        )
+    
     @classmethod
     def _fetch_all_toplevel_seq_regions(cls, session: Session, species_id: int = 1) -> tuple:
         stmt = (
@@ -475,84 +560,31 @@ class SliceAdaptor():
         
 
 
+# import time
+# from ensembl.database.dbconnection import DBConnection
+# # from ensembl.api.core.AssemblyMapper import Gap
+# def main():
+#     dbc = DBConnection('mysql://ensro@mysql-ens-sta-1.ebi.ac.uk:4519/homo_sapiens_core_110_38')
+#     with dbc.session_scope() as session:
+#         slice_name = 'chromosome:GRCh38:13:32315086:32400268:1' # forward only
+#         slice_name = 'chromosome:GRCh38:19:2269846:2270725' # mixed strand contigs, but FWD slice
+#         slice_name = 'chromosome:GRCh38:19:11455000:11474118' # REV slice
+#         cs1 = CoordSystemAdaptor.fetch_by_name(session, 'chromosome', 'GRCh38')
+#         cs2 = CoordSystemAdaptor.fetch_by_name(session, 'contig', None)
+#         slice = SliceAdaptor.fetch_by_name(session, slice_name)
+#         proj = SliceAdaptor.project(session, slice, cs2)
 
-    @classmethod
-    def project(cls, session: Session, slice: Slice, target_cs: CoordSystem) -> tuple:
-        if not session:
-            raise ValueError(f'Need a session to a DB to work')
-        if not target_cs or not isinstance(target_cs, CoordSystem):
-            raise ValueError(f'Need a coordinate system to project the slice to')
-        if not slice:
-            warnings.warn(f'Need a slice to start from', UserWarning)
-            return None
-        if not slice.coord_system:
-            warnings.warn(f'Cannot project slice {slice.name()} without an attached coordinate system', UserWarning)
-            return None
+#         # ama = AssemblyMapperAdaptor(session, cs1, cs2)
+#         # start = time.perf_counter()
+#         # aaa = ama.fetch_assembly_mappings()
+#         # print(f'First call: {time.perf_counter()-start}')
+#         # start = time.perf_counter()
+#         # aaa = ama.fetch_assembly_mappings()
+#         # print(f'Second call: {time.perf_counter()-start}')
+
+#         # [print(f'{k}:{v}') for k,v in aaa.items()]
+
         
-        slice_cs = slice.coord_system
-        
-        # no mapping is needed if the requested coord system is the one we are in
-        # but we do need to check if some of the slice is outside of defined regions
-        if slice_cs == target_cs:
-            (st, en, new_slice) = slice._constrain_to_region()
-            return ((st, en, new_slice),)
-        
-        # $normal_slice = $normal_slice_proj->[2]; this is the slice
 
-        
-        raise NotImplementedError()
-        
-        # asm_mapper = $asma->fetch_by_CoordSystems($slice_cs, $cs);
-        
-    #     my @coords = $asm_mapper->map($normal_slice->seq_region_name(),
-	# 			  $normal_slice->start(),
-	# 			  $normal_slice->end(),
-	# 			  $normal_slice->strand(),
-	# 			  $slice_cs, undef, undef, 1);
-        
-    #     foreach my $coord (@coords) {
-    #   my $original = $coord->{original};
-    #   my $mapped = $coord->{mapped};
-
-    #   # skip gaps
-    #   next unless $mapped->isa('Bio::EnsEMBL::Mapper::Coordinate');
-
-    #   my $mapped_start = $mapped->start();
-    #   my $mapped_end = $mapped->end();
-    #   my ($current_start, $current_end);
-    #   if ($self->strand == 1) {
-	# $current_start = $original->start() - $self->start + 1;
-	# $current_end = $original->end() - $self->start + 1;
-    #   } else {
-	# $current_start = $self->end() - $original->end + 1;
-	# $current_end = $self->end - $original->start + 1;
-    #   }
-      
-    #   my $coord_cs = $mapped->coord_system();
-
-    #   # If the normalised projection just ended up mapping to the
-    #   # same coordinate system we were already in then we should just
-    #   # return the original region.  This can happen for example, if we
-    #   # were on a PAR region on Y which refered to X and a projection to
-    #   # 'toplevel' was requested.
-    #   if($coord_cs->equals($slice_cs)) {
-	# # trim off regions which are not defined
-	# return $self->_constrain_to_region();
-    #   }
-    #   #create slices for the mapped-to coord system
-    #   my $slice = $slice_adaptor->fetch_by_seq_region_id($mapped->id(),
-	# 						 $mapped_start,
-	# 						 $mapped_end,
-	# 						 $mapped->strand());
-
-    #   if ($current_end > $slice->seq_region_length() && $slice->is_circular ) {
-	# $current_end -= $slice->seq_region_length();
-    #   }
-      
-    #   push @projection, bless([$current_start, $current_end, $slice],
-	# 		      "Bio::EnsEMBL::ProjectionSegment");
-      
-    # }
-
-
-   
+# if __name__ == '__main__':
+#     main()

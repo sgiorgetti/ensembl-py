@@ -13,6 +13,7 @@
 # limitations under the License.
 """Ensembl API dbsql modules"""
 from .AssemblyAdaptor import *
+from .AssemblyMapperAdaptor import *
 from .BiotypeAdaptor import *
 from .CoordSystemAdaptor import *
 from .ExonAdaptor import *
