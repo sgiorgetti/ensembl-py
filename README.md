@@ -95,21 +95,20 @@ The approach does not make a lot of sense:
 - use of a single `data model` for building/presenting data seems not working very well
 - some information are intrinsically related ... is the flat-file-only the only and right way to go? Isn't it a one-size-fits-all approach?
 
-### Current/latest try (experimental/genes-api)
+### Latest try on `experimental/genes-api`
 In this exercise, the target scenario is related to the `IDMapping` re-implementation, which comprises
 - Re-write the Perl scripts/pipeline with Python
 - Avoid RDBMS core DBs, as much as possible
 - Replace `exonerate` with `minimap2` directly or via `Liftoff`
-
-
-### Current "sprint" goals
-- Basic feature classes compatible with `ensembl-genes-api` and `ensembl`  concepts
+- Basic feature classes compatible with `ensembl`  concepts
 - Minimal feature adaptors for MySQL, using SQL Alchemy's one from `ensembl-py`
+- Building the ID Mapping Cache file ==> THIS MAKES NO SENSE, as it would require the full mapping and CS features of the API. Better keep the cache building as it is, and re-implement the ID Mapping logic with new tech! Also, `Liftoff` works with standard GFF files, and there is no need to use a custom dump from core DBs.
+- Basic sequence support
+
+
+### Repurposing/refocussing
 - Minimal feature adaptors for GFF/GTF file, using something as close as possible to `ensembl-genes-api`'s
-- Building the ID Mapping Cache file ==> THIS MAKES NO SENSE, as it would require the full mapping and CS features of the API. Better keep the cache building as it is, and re-implement the ID Mapping logic with new tech!
-
-
-
+- This should be preliminary to create GFF/GTF serializers and the mapping between storage systems (files and DB) and the data model
 
 
 [//]: # (List of references used before)
