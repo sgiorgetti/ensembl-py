@@ -121,7 +121,7 @@ class DBConnection:
 
         """
         result = self.execute(
-            select([self.tables['meta'].columns.meta_value]).where(text('meta_key = "schema_type"'))
+            select(self.tables['meta'].columns.meta_value).where(text('meta_key = "schema_type"'))
         )
         return result.one()[0]
 
@@ -136,7 +136,7 @@ class DBConnection:
 
         """
         result = self.execute(
-            select([self.tables['meta'].columns.meta_value]).where(text('meta_key = "schema_version"'))
+            select(self.tables['meta'].columns.meta_value).where(text('meta_key = "schema_version"'))
         )
         return int(result.one()[0])
 
