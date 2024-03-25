@@ -59,6 +59,7 @@ class Feature():
         self._seqname = seqname
         self._created_date = created_date
         self._modified_date = modified_date
+        self._attributes = {}
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(internal_id{self._internal_id}){self._slice.name}:{self._start}:{self._end}'
@@ -89,7 +90,7 @@ class Feature():
     @start.setter
     def start(self, value: int) -> None:
         if not isinstance(value, int):
-            raise('start argument must be int')
+            raise ValueError('start argument must be int')
         self._start = value
 
     @property
@@ -99,7 +100,7 @@ class Feature():
     @end.setter
     def end(self, value: int) -> None:
         if not isinstance(value, int):
-            raise('end argument must be int')
+            raise ValueError('end argument must be int')
         self._end = value
 
     @property
@@ -109,10 +110,10 @@ class Feature():
     @strand.setter
     def strand(self, value: Union[Strand, int]) -> None:
         if not value:
-            warnings.warn(f"Provided value is empty or None", UserWarning)
+            warnings.warn("Provided value is empty or None", UserWarning)
             return
         if not isinstance(value, Strand) or not isinstance(value, int):
-            raise('strand argument must be Strand or int')
+            raise ValueError('strand argument must be Strand or int')
         self._strand = value if isinstance(value, Strand) else Strand(value)
 
     @property
@@ -157,27 +158,34 @@ class Feature():
             # if circular, we can work out the length of an origin-spanning
             # feature using the size of the underlying region.
             if self._slice.is_circular():
-                len = self._slice.seq_region_length - (self._start-self._end) + 1
-                return len
-            raise Exception(f'Cannot determine length of non-circular feature where start > end')
+                return  self._slice.seq_region_length - (self._start-self._end) + 1
+            raise ValueError('Cannot determine length of non-circular feature where start > end')
         return self._end - self._start + 1
     
     @property
-    @cache
     def seqname(self, value: str) -> str:
         if value:
             self._seqname = value
         if not self._seqname and self._slice:
             self._seqname = self._slice.name
         return self._seqname
-
     
+    def set_attribs(self, attribs: dict[str, str]) -> None:
+        self._attributes = attribs
+
+    def get_attrib(self, att_code: str = None) -> dict:
+        if att_code is None:
+            return self._attributes
+        return {att_code: self._attributes.get(att_code)}
+    
+    def add_attrib(self, code: str, value: str) -> None:
+        self._attributes[code] = value
+
     def get_slice(self) -> Slice:
         return self._slice
     
     def set_slice(self, slice: Slice) -> None:
         self._slice = slice
-
 
     def transform(self, cs_name, cs_version, to_slice):
         raise NotImplementedError()
@@ -192,13 +200,7 @@ class Feature():
         raise NotImplementedError()
     
     def feature_slice(self) -> Slice:
-        if not self._slice:
-            warnings.warn(f"Cannot obtain Feature_Slice for feature without attached slice", UserWarning)
-            return None
-        
-        s = Slice(
-            # aaaa
-        )
+        raise NotImplementedError()
 
     @property
     def seq_region_name(self) -> str:
@@ -241,13 +243,13 @@ class Feature():
     def seq(self):
         raise NotImplementedError()
 
-    def get_summary(self) -> dict:
-        summary = {}
-        summary['id'] = self.internal_id
-        summary['version'] = self._version if self._version else ''
-        summary['start'] = self.seq_region_start()
-        summary['end'] = self.seq_region_end()
-        summary['strand'] = self._strand
-        summary['seq_region_name'] = self.seq_region_name()
-        return summary
+    # def get_summary(self) -> dict:
+    #     summary = {}
+    #     summary['id'] = self.internal_id
+    #     summary['version'] = self._version if self._version else ''
+    #     summary['start'] = self.seq_region_start()
+    #     summary['end'] = self.seq_region_end()
+    #     summary['strand'] = self._strand
+    #     summary['seq_region_name'] = self.seq_region_name()
+    #     return summary
 

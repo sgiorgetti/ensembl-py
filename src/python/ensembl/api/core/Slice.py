@@ -73,6 +73,7 @@ class Slice():
         self._internal_id = internal_id
         self._adaptor = adaptor
         self._topology = topology
+        self._attributes = {}
 
 
     def __repr__(self) -> str:
@@ -181,6 +182,20 @@ class Slice():
         if self._start > self._end and self.is_circular():
             len += self._seq_region_length
         return len
+    
+    def set_attribs(self, attribs: dict[str, str]) -> None:
+        self._attributes = attribs
+
+    def get_attribs(self, att_code: str = None) -> dict:
+        if att_code is None:
+            return self._attributes
+        return {att_code: self._attributes.get(att_code)}
+    
+    def add_attrib(self, code: str, value: str) -> None:
+        self._attributes[code] = value
+
+    def get_attrib(self, att_code: str = None) -> str:
+        return self._attributes.get(att_code)
     
     def is_reference(self):
         raise NotImplementedError()
@@ -334,9 +349,6 @@ class MappedSlice(Slice):
             self._asm_end
         )
         return rstr
-        
-    def __contains__(self, obj) -> bool:
-        return super().__contains__(obj)
     
     @property
     def asm_start(self) -> int:

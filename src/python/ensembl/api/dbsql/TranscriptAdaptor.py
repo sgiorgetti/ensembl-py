@@ -267,7 +267,7 @@ class TranscriptAdaptor():
         )
         if not res:
             return None
-        return cls.fetch_by_internal_id(res.Transcript.transcript_id)
+        return cls.fetch_by_internal_id(session, res.Transcript.transcript_id)
     
 
     @classmethod
@@ -283,7 +283,7 @@ class TranscriptAdaptor():
         )
         if not res:
             return None
-        return cls.fetch_by_internal_id(res.Transcript.transcript_id)
+        return cls.fetch_by_internal_id(session, res.Transcript.transcript_id)
 
 
     @classmethod

@@ -81,7 +81,6 @@ class Transcript(Feature):
         self._version = version
         
         self._slice = slice
-        self._attributes = {}
         self._exons = [] if not exons else exons
         self._internal_id = internal_id
         self._biotype = biotype
@@ -176,11 +175,19 @@ class Transcript(Feature):
 
     @property
     def spliced_seq(self) -> str:
-        self._spliced_seq
+        return "self._spliced_seq"
 
-    @spliced_seq.setter
-    def spliced_seq(self, value: str) -> None:
-        self._spliced_seq = value
+    @property
+    def translateable_seq(self) -> str:
+        return "self._translateable_seq"
+    
+    @property
+    def coding_region_start(self) -> str:
+        return "self._coding_region_start"
+    
+    @property
+    def coding_region_end(self) -> str:
+        return "self._coding_region_end"
 
     @property
     def external_name(self) -> str:
@@ -249,22 +256,11 @@ class Transcript(Feature):
     def set_exons(self, exons: list[SplicedExon]) -> None:
         self._exons = exons
 
-    def get_introns(self) -> tuple:
-        return self._introns
+    # def get_introns(self) -> tuple:
+    #     return self._introns
     
-    def set_introns(self, introns: list) -> None:
-        self._introns = introns
-    
-    def set_attribs(self, attribs: dict[str, str]) -> None:
-        self._attributes = attribs
-
-    def get_attribs(self, att_code: str = None) -> Union[dict, tuple]:
-        if att_code is None:
-            return self._attributes
-        return tuple(att_code, self._attributes.get(att_code))
-    
-    def add_attrib(self, code: str, value: str) -> None:
-        self._attributes[code] = value
+    # def set_introns(self, introns: list) -> None:
+    #     self._introns = introns
 
     def is_canonical(self) -> bool:
         return True if self._is_canonical else False
@@ -279,7 +275,14 @@ class Transcript(Feature):
             if 'mane' in att_code:
                 return True
         return False
-
+    
+    def translate(self) -> str:
+        mrna = self.translateable_seq
+        codon_table_id = int(self._slice.get_attrib('codon_table'))
+        if codon_table_id is None:
+            codon_table_id = 1
+        raise NotImplementedError()
+        
 
     def get_summary(self) -> dict[str, str]:
         """
