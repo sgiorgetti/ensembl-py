@@ -11,13 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Exon module"""
 
-from .Slice import Slice
-from .Strand import Strand
-from .Feature import Feature
-from typing import Union
+__all__ = ["Exon"]
 
-__all__ = [ 'Exon', 'SplicedExon' ]
+from typing import Union, Self
+import warnings
+from . import Feature, Location, Slice, Strand
 
 class Exon(Feature):
     """Representation of an exon.
@@ -40,54 +40,65 @@ class Exon(Feature):
     """
 
     __type = 'exon'
- 
+
     def __init__(self,
-                 stable_id: str,
-                 version: int,
+                 location: Location,
+                 strand: Strand,
                  phase: int,
                  end_phase: int,
+                 gen_slice: Slice = None,
                  internal_id: Union[str, int] = None,
-                 slice: Slice = None,
-                 start: int = None,
-                 end: int = None,
-                 strand: Strand = None,
+                 stable_id: str = None,
+                 version: int = None,
                  analysis: str = None,
                  is_constitutive: bool = False,
-                 is_current: bool = True,
-                 created_date = None,
-                 modified_date = None
+                 is_current: bool = True
                 ) -> None:
-        if not stable_id:
-            raise ValueError()
-        if not Slice:
-            raise ValueError()
-        if stable_id.find('.') > 0:
-            raise ValueError()
         if not isinstance(phase, int):
-            raise ValueError('phase argument must be int')
+            raise ValueError("phase argument must be int")
         if phase not in (-1, 0, 1, 2):
-            raise ValueError(f'Bad value {phase} for exon phase: it must be any of (-1, 0, 1, 2)')
+            raise ValueError(f"Bad value {phase} for exon phase: it must be any of (-1, 0, 1, 2)")
         if end_phase is None:
-            raise ValueError(f"No end phase set in Exon. You must set it explicitly.")
+            raise ValueError("No end phase set in Exon. You must set it explicitly.")
         self._stable_id = stable_id
         self._version = version
-        self._slice = slice
+        self._slice = gen_slice
         self._phase = phase
         self._end_phase = end_phase
         self._is_constitutive = is_constitutive
         self._is_current = is_current
         self._internal_id = internal_id
+        super().__init__(location, strand, gen_slice, analysis, internal_id)
 
-        super().__init__(start, end, strand, slice, analysis, internal_id, created_date, modified_date)
-    # (1, 1, 76835377, 76835502, -1, -1, -1, 1, 0, 'ENSE00002089356', 1, datetime.datetime(2022, 7, 5, 10, 44, 45), datetime.datetime(2022, 7, 5, 10, 44, 45))
+    @classmethod
+    def fastinit(cls, start: int, end: int, strand: int, gen_slice: Slice,
+                 phase: int = -1, end_phase: int = -1) -> Self:
+        loc = Location(start, end)
+        return cls(loc, Strand(strand), phase, end_phase, gen_slice)
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.stable_id})'
-    
+        eid = self.stable_id if self._stable_id else self._slice.region.name
+        return f'{self.__class__.__name__}({eid}:{self.start}:{self.end}:{self.strand.value}\
+            -{self.phase}:{self._end_phase})'
+
+    @property
+    def location(self) -> Location:
+        return self._location
+
+    @property
+    def start(self) -> int:
+        return self._location.start
+
+    @property
+    def end(self) -> int:
+        return self._location.end
+
     @property
     def stable_id_version(self) -> str:
-        return f"{self._stable_id}.{self._version}"
-    
+        if self._stable_id:
+            return f"{self._stable_id}.{self._version}"
+        return None
+
     @property
     def stable_id(self) -> str:
         return self._stable_id
@@ -98,10 +109,6 @@ class Exon(Feature):
             (self._stable_id, self._version) = value.split('.')
         else:
             self._stable_id = value
-    
-    @property
-    def type(self) -> str:
-        return self.__type
 
     @property
     def version(self):
@@ -115,12 +122,23 @@ class Exon(Feature):
     def phase(self) -> int:
         return self._phase
 
-    @property
-    def end_phase(self) -> int:
-        return self._end_phase
+    @phase.setter
+    def phase(self, value: int) -> None:
+        if value not in (-1, 0, 1, 2):
+            raise ValueError(f"Bad value {value} for exon phase: it must be any of (-1, 0, 1, 2)")
+        self._phase = value
 
     @property
-    def frame(self):
+    def end_phase(self) -> int:
+        if self._end_phase:
+            return self._end_phase
+        exon_id = self._stable_id if self._stable_id else self._internal_id
+        msg = f"No end phase set in Exon {exon_id}. You must set it explicitly."
+        warnings.warn(msg, UserWarning)
+        return None
+
+    @property
+    def frame(self) -> int:
         if self._phase == -1:
             return '.' # gff convention for no frame info
         if self._phase == 0:
@@ -129,123 +147,54 @@ class Exon(Feature):
             return (self._start + 2)%3
         if self._phase == 2:
             return (self._start + 1)%3
-        raise Exception(f"bad phase in exon {self.phase}")
-    
+        raise ValueError(f"bad phase in exon {self._phase}")
+
     @property
-    def is_constitutive(self):
+    def is_constitutive(self) -> bool:
         return self._is_constitutive
 
     @is_constitutive.setter
     def is_constitutive(self, value: bool) -> None:
         if not isinstance(value, bool):
-            raise ValueError(f'New value must be boolean')
+            raise ValueError("New value must be boolean")
         self._is_constitutive = value
 
     @property
-    def internal_id(self):
-        return self._internal_id
-    
+    def exon_string(self) -> str:
+        return f"{self.start}:{self.end}:{self.strand.value}"
 
-
-    def get_summary(self) -> dict[str, str]:
-        """
-        Example       : exon_summary = exon.get_summary()
-        Description   : Retrieves a textual summary of this Feature.
-        Returns       : Dict[str, str]
-        Status        : Alpha - Intended for internal use
-        """
-        summary = super().get_summary()
-        summary['id'] = self._stable_id
-        summary['exon_id'] = self._stable_id
-        summary['version'] = self.version if self.version else ''
-        summary['start'] = self.start
-        summary['end'] = self.end
-        summary['strand'] = self.strand.value
-        summary['seq_region_name'] = self.seqname
-        summary['constitutive'] = str(self._is_constitutive)
-        summary['ensembl_phase'] = self._phase
-        summary['ensembl_end_phase'] = self._end_phase
-        return summary
-
-
-class SplicedExon(Exon):
-    def __init__(self,
-                 stable_id: str,
-                 version: int,
-                 phase: int,
-                 end_phase: int,
-                 index: int,
-                 internal_id: Union[str, int] = None,
-                 slice: Slice = None,
-                 start: int = None,
-                 end: int = None,
-                 strand: Strand = None,
-                 analysis: str = None,
-                 is_constitutive: bool = False,
-                 is_current: bool = True,
-                 transcript_source = None,
-                 created_date = None,
-                 modified_date = None
-                ) -> None:
-        
-        self._index = index
-        self._transcript_source = transcript_source
-        super().__init__(stable_id,
-                       version,
-                       phase,
-                       end_phase,
-                       internal_id,
-                       slice,
-                       start,
-                       end,
-                       strand,
-                       analysis,
-                       is_constitutive,
-                       is_current,
-                       created_date,
-                       modified_date
-                       )
-        
-    def __repr__(self) -> str:
-        return super().__repr__()
-    
     @property
-    def index(self) -> int:
-        return self._index
-    
-    @property
-    def source(self) -> str:
-        return self._transcript_source
-    
-    @property
-    def transcript_source(self) -> str:
-        return self._transcript_source
+    def seq(self) -> str:
+        return self._sequence.seq
 
+    @seq.setter
+    def seq(self, value) -> None:
+        raise NotImplementedError()
 
-    def get_summary(self) -> dict[str, str]:
+    def adjust_start_end(self, start_adj: int, end_adj: int) -> Self:
         """
-        Example       : exon_summary = exon.get_summary()
-        Description   : Retrieves a textual summary of this Feature.
-        Returns       : Dict[str, str]
-        Status        : Alpha - Intended for internal use
+        What's the meaning of a new exon with same IDs and different
+        coordinates? Wouldn't be better to reset the IDs or change the
+        initial exon?
+        To be confirmed!!
         """
-        summary = super().get_summary()
-        summary['exon_index'] = self._index
-        return summary
-    
-    
-    # 1       havana  exon    65419   65433   .       +       .       Parent=transcript:ENST00000641515;Name=ENSE00003812156;constitutive=1;ensembl_end_phase=-1;ensembl_phase=-1;exon_id=ENSE00003812156;rank=1;version=1
-    def gff3_qualifiers(self) -> dict[str, Union[str, tuple[str]]]:
-        qualifiers = {
-            'source': self.source,
-            'score': ".",
-            'Name': self._stable_id,
-            'constitutive': str(self._is_constitutive),
-            'ensembl_phase': self._phase,
-            'ensembl_end_phase': self._end_phase,
-            'exon_id': self._stable_id,
-            'rank': self._index,
-            'version': self.version
-        }
-
-        return qualifiers
+        cur_loc = self._location
+        if self._strand == Strand.FORWARD:
+            new_loc = Location(cur_loc.start + start_adj,
+                               cur_loc.end + end_adj)
+        else:
+            new_loc = Location(cur_loc.start - end_adj,
+                               cur_loc.end - start_adj)
+        return Exon(
+            new_loc,
+            self._strand,
+            self._phase,
+            self._end_phase,
+            self._slice,
+            self._internal_id,
+            self._stable_id,
+            self._version,
+            self._analysis,
+            self._is_constitutive,
+            self._is_current
+        )

@@ -11,13 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from . import SplicedExon, Slice, Feature, Strand, Biotype
-from .Translation import Translation
-from typing import Union
-
+"""Transcript module"""
 
 __all__ = [ 'Transcript' ]
+
+from typing import Union
+from . import Analysis, Biotype, CoordinateSystem, Exon, Location, Slice, Feature, Strand, Translation
 
 class Transcript(Feature):
     """Representation of a transcript.
@@ -44,62 +43,36 @@ class Transcript(Feature):
     """
 
     __type = 'transcript'
- 
+
     def __init__(self,
                  stable_id: str,
                  version: int = 1,
                  internal_id: Union[str, int] = None,
-                 slice: Slice = None,
-                 start: int = None,
-                 end: int = None,
+                 gen_slice: Slice = None,
+                 location: Location = None,
                  strand: Strand = None,
-                 analysis: str = None,
-                 exons: list[SplicedExon] = None,
+                 exons: list[Exon] = None,
+                 analysis: Analysis = None,
                  biotype: Biotype = None,
                  source: str = 'ensembl',
                  is_current: bool = True,
-                 is_canonical: bool = False,
-                 external_name: str = None,
-                 external_db: str = None,
-                 external_status: str = None,
-                 display_xref: str = None,
-                 description: str = None,
-                 created_date: str = None,
-                 modified_date: str = None,
-                 spliced_seq: str = None,
-                 canonical_translation_id: int = None
+                 is_canonical: bool = False
                 ) -> None:
-        
 
-        if not stable_id:
-            raise ValueError()
-        if not Slice:
-            raise ValueError()
-        if stable_id.find('.') > 0:
-            raise ValueError()
         self._stable_id = stable_id
         self._version = version
-        
-        self._slice = slice
         self._exons = [] if not exons else exons
         self._internal_id = internal_id
         self._biotype = biotype
         self._source = source
         self._is_current = is_current
         self._is_canonical = is_canonical
-        self._spliced_seq = spliced_seq
         self._translation = None
-        self._canonical_translation_id = canonical_translation_id
+        self._seq: str = None
+        self._coding_region_start: int = None
+        self._coding_region_end: int = None
 
-        self._external_name = external_name
-        self._external_db = external_db
-        self._external_status = external_status
-        self._display_xref = display_xref
-        self._description = description
-
-        super().__init__(start, end, strand, slice, analysis, internal_id, created_date, modified_date)
-        
-        
+        super().__init__(location, strand, gen_slice, analysis, internal_id)
 
     def __repr__(self) -> str:
         if self._stable_id:
@@ -107,17 +80,11 @@ class Transcript(Feature):
                 return f'{self.__class__.__name__}({self.stable_id} - canonical)'
             return f'{self.__class__.__name__}({self.stable_id})'
         return f'{self.__class__.__name__}(internal_id{self._internal_id})'
-    
-    @property
-    def name(self) -> str:
-        if self._external_name:
-            return self._external_name
-        return self.stable_id
-    
+
     @property
     def stable_id_version(self) -> str:
         return f"{self._stable_id}.{self._version}"
-    
+
     @property
     def stable_id(self) -> str:
         return self._stable_id
@@ -128,7 +95,7 @@ class Transcript(Feature):
             (self._stable_id, self._version) = value.split('.')
         else:
             self._stable_id = value
-    
+
     @property
     def type(self) -> str:
         return self.__type
@@ -144,11 +111,7 @@ class Transcript(Feature):
     @property
     def internal_id(self) -> int:
         return self._internal_id
-    
-    @property
-    def dbID(self) -> int:
-        return self._internal_id
-    
+
     @property
     def biotype(self) -> Biotype:
         return self._biotype
@@ -174,70 +137,6 @@ class Transcript(Feature):
         self._is_current = value
 
     @property
-    def spliced_seq(self) -> str:
-        return "self._spliced_seq"
-
-    @property
-    def translateable_seq(self) -> str:
-        return "self._translateable_seq"
-    
-    @property
-    def coding_region_start(self) -> str:
-        return "self._coding_region_start"
-    
-    @property
-    def coding_region_end(self) -> str:
-        return "self._coding_region_end"
-
-    @property
-    def external_name(self) -> str:
-        return self._external_name
-
-    @external_name.setter
-    def external_name(self, value: str) -> None:
-        self._external_name = value
-
-    @property
-    def external_db(self) -> str:
-        return self._external_db
-
-    @external_db.setter
-    def external_db(self, value: str) -> None:
-        self._external_db = value
-
-    @property
-    def external_status(self) -> str:
-        return self._external_status
-
-    @external_status.setter
-    def external_status(self, value: str) -> None:
-        self._external_status = value
-
-    @property
-    def display_xref(self) -> str:
-        return self._display_xref
-
-    @display_xref.setter
-    def display_xref(self, value: str) -> None:
-        self._display_xref = value
-
-    @property
-    def description(self) -> str:
-        return self._description
-
-    @description.setter
-    def description(self, value: str) -> None:
-        self._description = value
-
-    @property
-    def canonical_translation_id(self) -> int:
-        return self._canonical_translation_id
-
-    # @property
-    # def length(self) -> int:
-    #     raise NotImplementedError
-    
-    @property
     def translation(self) -> Translation:
         return self._translation
 
@@ -250,83 +149,96 @@ class Transcript(Feature):
     def set_translation(self, tl: Translation) -> None:
         self.translation = tl
 
-    def get_exons(self) -> list[SplicedExon]:
+    def get_exons(self, constitutive: bool = False) -> list[Exon]:
+        if constitutive:
+            return [ e for e in self._exons if e.is_constitutive ]
         return self._exons
-    
-    def set_exons(self, exons: list[SplicedExon]) -> None:
+
+    def set_exons(self, exons: list[Exon]) -> None:
         self._exons = exons
 
-    # def get_introns(self) -> tuple:
-    #     return self._introns
-    
-    # def set_introns(self, introns: list) -> None:
-    #     self._introns = introns
+    def set_attribs(self, attribs: dict[str, str]) -> None:
+        self._attributes = attribs
+
+    def get_attribs(self, att_code: str = None) -> Union[dict, tuple]:
+        if att_code is None:
+            return self._attributes
+        return tuple(att_code, self._attributes.get(att_code))
+
+    def add_attrib(self, code: str, value: str) -> None:
+        self._attributes[code] = value
 
     def is_canonical(self) -> bool:
-        return True if self._is_canonical else False
-    
+        return self._is_canonical
+
     def is_mane_select(self) -> bool:
-        if self._attributes.get('MANE_Select'):
-            return True
-        return False
-    
+        return 'MANE_Select' in self._attributes
+
     def is_mane(self) -> bool:
-        for att_code in self._attributes.keys().lower():
-            if 'mane' in att_code:
-                return True
-        return False
-    
-    def translate(self) -> str:
-        mrna = self.translateable_seq
-        codon_table_id = int(self._slice.get_attrib('codon_table'))
-        if codon_table_id is None:
-            codon_table_id = 1
+        return 'mane' in self._attributes.keys().lower()
+
+    @property
+    def seq(self) -> str:
         raise NotImplementedError()
-        
 
-    def get_summary(self) -> dict[str, str]:
-        """
-        Example       : transcript_summary = transcript.get_summary()
-        Description   : Retrieves a textual summary of this Feature.
-        Returns       : Dict[str, str]
-        Status        : Alpha - Intended for internal use
-        """
-        summary = super().get_summary()
-        summary['transcript_id'] = self._stable_id
+    @seq.setter
+    def seq(self, value) -> None:
+        raise NotImplementedError()
 
-        summary['description'] = self._description
-        summary['biotype'] = self._biotype.name
-        summary['source'] = self._source
-        summary['symbol'] = self._external_name
-        summary['logic_name'] = summary['analysis']
-        if self._attributes.get('ccds_transcript'):
-            summary['ccdsid'] = self._attributes.get('ccds_transcript').value
-        if self._attributes.get('tsl'):
-            summary['transcript_support_level'] = self._attributes.get('tsl').value
-        if self._attributes.get('gencode_basic'):
-            summary['tag'] = 'basic'
+    def coding_region_start(self) -> int:
+        if self._coding_region_start:
+            return self._coding_region_start
+        if not self._translation:
+            return None
+        if self._translation.coord_system != CoordinateSystem.GENOMIC:
+            raise NotImplementedError
 
-        return summary
-    
-# 1       havana  mRNA    65419   71585   .       +       .       ID=transcript:ENST00000641515;Parent=gene:ENSG00000186092;Name=OR4F5-201;biotype=protein_coding;tag=basic,Ensembl_canonical,MANE_Select;transcript_id=ENST00000641515;version=2
-    def gff3_qualifiers(self) -> dict[str, Union[str, tuple[str]]]:
+        start = 0
+        strand = self._translation.start_exon.strand
+        if strand == Strand.FORWARD:
+            start = self._translation.start_exon.start
+            start += self._translation.start - 1
+        else:
+            start = self._translation.end_exon.end
+            start -= self._translation.end - 1
+        self._coding_region_start = start
+        return start
 
-        tags = ['basic']
-        if self.is_canonical():
-            tags.append('Ensembl_canonical')
-        if self.is_mane_select():
-            tags.append('MANE_Select')
-        
-        qualifiers = {
-            'source': self._source,
-            'score': ".",
-            'ID': f"{self.__type}:{self._stable_id}",
-            'Parent': "None",
-            'Name': self._external_name,
-            'biotype': self._biotype.name,
-            'transcript_id': self._stable_id,
-            'version': self._version
-        }
-        qualifiers['tag'] = tuple(tags)
+    def coding_region_end(self) -> int:
+        if self._coding_region_end:
+            return self._coding_region_end
+        if not self._translation:
+            return None
+        if self._translation.coord_system != CoordinateSystem.GENOMIC:
+            raise NotImplementedError
 
-        return qualifiers
+        end = 0
+        strand = self._translation.start_exon.strand
+        if strand == Strand.FORWARD:
+            end = self._translation.end_exon.start
+            end += self._translation.end - 1
+        else:
+            end = self._translation.start_exon.end
+            end -= self._translation.start - 1
+        self._coding_region_end = end
+        return end
+
+    def get_all_translateable_exons(self) -> list[Exon]:
+        if not self._translation:
+            return []
+        trl = self._translation
+        ex_list = []
+        for e in self._exons:
+            adjust = 0
+            if e == trl.start_exon:
+                adjust = trl.start - 1
+                if adjust != 0:
+                    ex_list.append(e.adjust_start_end(adjust, 0))
+                    continue
+            if e == trl.end_exon:
+                adjust = trl.end - e.length
+                if adjust != 0:
+                    ex_list.append(e.adjust_start_end(0, adjust))
+                    break
+            ex_list.append(e)
+        return ex_list

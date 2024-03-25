@@ -11,19 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Assembly module"""
+"""Analysis module"""
 
-__all__ = ["Assembly"]
+__all__ = [ 'Analysis' ]
 
 from dataclasses import dataclass, field
-from uuid import UUID
-from typing import Optional
 
 @dataclass
-class Assembly():
+class Analysis():
     """
-    Simplified version of Assembly class
+    Useful???
     """
-    name: str
-    organism: Optional[str]
-    uuid: Optional[UUID] = field(repr=False)
+    logic_name: str
+    module: str = field(compare=False, default=None)

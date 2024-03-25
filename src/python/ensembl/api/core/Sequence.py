@@ -11,10 +11,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Sequence module"""
 
+__all__ = ["Alphabet", "Sequence"]
+
+from dataclasses import dataclass, field
 from enum import Enum
+from functools import cache
 
-class Strand(Enum):
-    FORWARD = 1
-    UNDEFINED = 0
-    REVERSE = -1
+@cache
+def _get_sequence() -> str:
+    raise NotImplementedError
+
+class Alphabet(Enum):
+    """
+    Enum class to represent a Sequence's alphabet
+    """
+    DNA: 1
+    RNA: 2
+    PROTEIN: 3
+
+@dataclass
+class Sequence():
+    """
+    The Sequence data type describes a contiguous set of
+    nucleic acid or amino acid residues in biological molecules,
+    such as DNA, RNA, or proteins
+    """
+    seq_id: str
+    seq: str = field(repr=False)
+    alphabet: Alphabet = field(default=Alphabet.DNA)
