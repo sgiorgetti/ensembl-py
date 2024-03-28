@@ -14,7 +14,7 @@
 """Slice module"""
 
 __all__ = ["Slice", "Location", "LocationModifier", "Region",
-           "RegionType", "Strand", "Topology", "CoordinateSystem"]
+           "RegionType", "Strand", "Topology"]
 
 from dataclasses import dataclass, field
 from enum import Enum
@@ -27,12 +27,6 @@ class Topology(Enum):
     """
     LINEAR = 1
     CIRCULAR = 2
-
-class CoordinateSystem(Enum):
-    """
-    Enum class to represent the coordinate system
-    """
-    GENOMIC = 1
 
 class RegionType(Enum):
     """
@@ -66,7 +60,6 @@ class Location():
     on a Region
     """
     def __init__(self, start: int, end: int,
-                 coord_sys_type: CoordinateSystem = CoordinateSystem.GENOMIC,
                  location_modifier: LocationModifier = None) -> None:
         if not start or not end:
             raise ValueError("Both Location start and end must be specified")
@@ -74,24 +67,18 @@ class Location():
         end = int(end)
         if end + 1 < start:
             raise ValueError("Location start must be less than end")
-        if coord_sys_type != CoordinateSystem.GENOMIC:
-            raise NotImplementedError("Can only manage genomic coordinates!")
         self._start = start
         self._end = end
-        self._coord_system = coord_sys_type
         self._location_modifier = location_modifier
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.start}-{self.end}-{self.coordinate_system.name})'
+        return f'{self.__class__.__name__}({self.start}-{self.end})'
 
     def __str__(self) -> str:
         return f'{self.__class__.__name__}({self.start}-{self.end})'
 
     def __contains__(self, other) -> bool:
         if isinstance(other, Location):
-            if other._coord_system != self._coord_system:
-                warnings.warn("Cannot compare Location objects on different coordinate systems")
-                return False
             return self.start <= other.start and other.end <= self.end
         if isinstance(other, int):
             return self.start <= other <= self.end
@@ -102,9 +89,6 @@ class Location():
         if not isinstance(other, Location):
             warnings.warn(f"Cannot compare Location to object type {type(other)}")
             return False
-        if other._coord_system != self._coord_system:
-            warnings.warn("Cannot compare Location objects on different coordinate systems")
-            return False
         if self.start == other.start and self.end == other.end:
             return True
         return False
@@ -114,10 +98,6 @@ class Location():
             warnings.warn(f"Cannot compare Location to object type {type(other)}")
             return False
         return self.end < other.start
-
-    @property
-    def coordinate_system(self) -> CoordinateSystem:
-        return self._coord_system
 
     @property
     def start(self) -> int:
