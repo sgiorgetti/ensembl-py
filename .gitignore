@@ -133,6 +133,7 @@ dmypy.json
 .vscode/
 
 # Output files/folders
+data/
 *.fa
 *.fa[ai]
 *.gff
