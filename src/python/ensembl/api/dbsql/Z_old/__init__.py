@@ -11,4 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""DBSQL core module"""
+"""Ensembl API dbsql modules"""
+from .AssemblyAdaptor import *
+from .AssemblyMapperAdaptor import *
+from .BiotypeAdaptor import *
+from .CoordSystemAdaptor import *
+from .ExonAdaptor import *
+from .GeneAdaptor import *
+from .MetaAdaptor import *
+from .SequenceAdaptor import *
+from .SliceAdaptor import *
+from .TranscriptAdaptor import *
+from .TranslationAdaptor import *
