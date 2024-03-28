@@ -11,14 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""GB API core module"""
+"""API core module"""
 
 from .Analysis import *
 from .Assembly import *
 from .Biotype import *
-from .Exon import *
-from .Feature import *
 from .Sequence import *
 from .Slice import *
+from .Feature import *
 from .Transcript import *
+from .Exon import *
 from .Translation import *

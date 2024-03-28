@@ -27,9 +27,9 @@ class Alphabet(Enum):
     """
     Enum class to represent a Sequence's alphabet
     """
-    DNA: 1
-    RNA: 2
-    PROTEIN: 3
+    DNA = 1
+    RNA = 2
+    PROTEIN = 3
 
 @dataclass
 class Sequence():
@@ -40,4 +40,4 @@ class Sequence():
     """
     seq_id: str
     seq: str = field(repr=False)
-    alphabet: Alphabet = field(default=Alphabet.DNA)
+    alphabet: Alphabet = Alphabet.DNA

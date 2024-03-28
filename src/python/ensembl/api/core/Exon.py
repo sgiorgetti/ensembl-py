@@ -72,9 +72,9 @@ class Exon(Feature):
 
     @classmethod
     def fastinit(cls, start: int, end: int, strand: int, gen_slice: Slice,
-                 phase: int = -1, end_phase: int = -1) -> Self:
+                 phase: int = -1, end_phase: int = -1, internal_id: str = None, analysis: str = None) -> Self:
         loc = Location(start, end)
-        return cls(loc, Strand(strand), phase, end_phase, gen_slice)
+        return cls(loc, Strand(strand), phase, end_phase, gen_slice, internal_id, None, None, analysis)
 
     def __repr__(self) -> str:
         eid = self.stable_id if self._stable_id else self._slice.region.name

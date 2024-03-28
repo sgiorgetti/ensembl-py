@@ -13,13 +13,13 @@
 # limitations under the License.
 """Slice module"""
 
-__all__ = ["Slice", "Location", "LocationModifier", "Region", 
-           "RegionType", "Topology", "CoordinateSystem"]
+__all__ = ["Slice", "Location", "LocationModifier", "Region",
+           "RegionType", "Strand", "Topology", "CoordinateSystem"]
 
 from dataclasses import dataclass, field
 from enum import Enum
 import warnings
-from . import Sequence, Assembly, Alphabet, Strand
+from . import Sequence, Assembly, Alphabet
 
 class Topology(Enum):
     """
@@ -43,6 +43,14 @@ class RegionType(Enum):
     PLASMID = 3
     CONTIG = 4
 
+class Strand(Enum):
+    """
+    Enum class to represent the strand-ness
+    """
+    FORWARD = 1
+    UNDEFINED = 0
+    REVERSE = -1
+
 @dataclass
 class LocationModifier():
     """
@@ -62,7 +70,9 @@ class Location():
                  location_modifier: LocationModifier = None) -> None:
         if not start or not end:
             raise ValueError("Both Location start and end must be specified")
-        if self.end + 1 < self.start:
+        start = int(start)
+        end = int(end)
+        if end + 1 < start:
             raise ValueError("Location start must be less than end")
         if coord_sys_type != CoordinateSystem.GENOMIC:
             raise NotImplementedError("Can only manage genomic coordinates!")
@@ -157,7 +167,7 @@ class Region():
     accession_id: str = field(repr=False, default='', compare=False)
     sequence: Sequence = field(init=False, repr=False, compare=False, default=None)
     assembly: Assembly = field(init=False, repr=False, default=None)
-    metadata: dict[str,str] = field(repr=False, compare=False, default={})
+    metadata: dict = field(default_factory=dict, init=False, repr=False)
 
 class Slice():
     """
@@ -206,7 +216,7 @@ class Slice():
         except TypeError:
             pass
 
-        reg = Region(seq_region_name, RegionType[seq_region_type], seq_region_length,
+        reg = Region(seq_region_name, RegionType[seq_region_type.upper()], seq_region_length,
                      genetic_code=None)
         loc = Location(seq_region_start, seq_region_end)
         if seq:

@@ -15,8 +15,9 @@
 
 __all__ = [ 'Transcript' ]
 
-from typing import Union
-from . import Analysis, Biotype, CoordinateSystem, Exon, Location, Slice, Feature, Strand, Translation
+from typing import Union, Self
+from . import Analysis, Biotype, CoordinateSystem, Exon, Location, Slice, \
+    Sequence, Feature, Strand, Translation
 
 class Transcript(Feature):
     """Representation of a transcript.
@@ -45,41 +46,59 @@ class Transcript(Feature):
     __type = 'transcript'
 
     def __init__(self,
-                 stable_id: str,
-                 version: int = 1,
-                 internal_id: Union[str, int] = None,
-                 gen_slice: Slice = None,
-                 location: Location = None,
-                 strand: Strand = None,
-                 exons: list[Exon] = None,
+                 location: Location,
+                 strand: Strand,
+                 reg_slice: Slice,
                  analysis: Analysis = None,
+                 exons: list[Exon] = None,
+                 internal_id: Union[str, int] = None,
+                 sequence: Sequence = None,
                  biotype: Biotype = None,
                  source: str = 'ensembl',
+                 stable_id: str = None,
+                 version: int = 1,
                  is_current: bool = True,
                  is_canonical: bool = False
                 ) -> None:
-
         self._stable_id = stable_id
         self._version = version
         self._exons = [] if not exons else exons
         self._internal_id = internal_id
+        self._sequence: str = sequence
         self._biotype = biotype
         self._source = source
         self._is_current = is_current
         self._is_canonical = is_canonical
         self._translation = None
-        self._seq: str = None
         self._coding_region_start: int = None
         self._coding_region_end: int = None
 
-        super().__init__(location, strand, gen_slice, analysis, internal_id)
+        super().__init__(location, strand, reg_slice, analysis, internal_id)
+
+    @classmethod
+    def fastinit(cls, start: int, end: int, length: int, analysis_name: str,
+                 strand: int, reg_slice: Slice = None, internal_id: int = None,
+                 biotype: str = None, sequence: str = None) -> Self:
+        if not start:
+            raise ValueError("Feature start must be specified")
+        start = int(start)
+        if not end and not length:
+            raise ValueError("Either feature end or length must be specified")
+        if not end:
+            end = start + int(length) - 1
+        end = int(end)
+        an = Analysis(analysis_name) if analysis_name else None
+        loc = Location(start, end)
+        st = Strand(strand)
+        seq = Sequence(seq_id=None, seq=sequence) if sequence else None
+        return cls(loc, st, reg_slice, an, internal_id, seq, biotype)
 
     def __repr__(self) -> str:
         if self._stable_id:
             if self._attributes.get('is_canonical'):
                 return f'{self.__class__.__name__}({self.stable_id} - canonical)'
             return f'{self.__class__.__name__}({self.stable_id})'
-        return f'{self.__class__.__name__}(internal_id{self._internal_id})'
+        return super().__repr__()
 
     @property
     def stable_id_version(self) -> str:
@@ -91,10 +110,7 @@ class Transcript(Feature):
 
     @stable_id.setter
     def stable_id(self, value: str) -> None:
-        if value.find('.') > 0:
-            (self._stable_id, self._version) = value.split('.')
-        else:
-            self._stable_id = value
+        self._stable_id = value
 
     @property
     def type(self) -> str:
@@ -137,6 +153,14 @@ class Transcript(Feature):
         self._is_current = value
 
     @property
+    def is_canonical(self) -> bool:
+        return self._is_canonical
+    
+    @is_canonical.setter
+    def is_canonical(self, value: bool) -> None:
+        self.is_canonical = value
+
+    @property
     def translation(self) -> Translation:
         return self._translation
 
@@ -167,9 +191,6 @@ class Transcript(Feature):
 
     def add_attrib(self, code: str, value: str) -> None:
         self._attributes[code] = value
-
-    def is_canonical(self) -> bool:
-        return self._is_canonical
 
     def is_mane_select(self) -> bool:
         return 'MANE_Select' in self._attributes

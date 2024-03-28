@@ -13,20 +13,11 @@
 # limitations under the License.
 """Generic Feature module"""
 
-__all__ = [ "Feature", "Strand" ]
+__all__ = [ "Feature" ]
 
-from enum import Enum
 from typing import Union
 import warnings
-from . import Analysis, Location, RegionType, Sequence, Slice
-
-class Strand(Enum):
-    """
-    Enum class to represent the strand-ness
-    """
-    FORWARD = 1
-    UNDEFINED = 0
-    REVERSE = -1
+from . import Analysis, Location, RegionType, Sequence, Slice, Strand
 
 class Feature():
     """
@@ -60,7 +51,8 @@ class Feature():
                 raise ValueError(f"Feature {internal_id} location not contained in given Slice")
         except TypeError:
             pass
-
+        if not internal_id:
+            internal_id = f"{reg_slice.region.name}:{location.start}:{location.end}:{strand.value}"
         self._location = location
         self._slice = reg_slice
         self._strand = strand
@@ -69,25 +61,26 @@ class Feature():
         self._sequence = sequence
         self._attributes = {}
 
-    @classmethod
-    def fastinit(cls, start: int, end: int, length: int, analysis_name: str,
-                 strand: int, reg_slice: Slice = None, internal_id: int = None,
-                 sequence: str = None):
-        if not start:
-            raise ValueError("Feature start must be specified")
-        if not end and not length:
-            raise ValueError("Either feature end or length must be specified")
-        if not end:
-            end = start + length - 1
-        an = Analysis(analysis_name) if analysis_name else None
-        loc = Location(start, end)
-        st = Strand(strand)
-        seq = Sequence(seq_id=None, seq=sequence) if sequence else None
-        return cls(loc, st, reg_slice, an, internal_id, seq)
+    # @classmethod
+    # def fastinit(cls, start: int, end: int, length: int, analysis_name: str,
+    #              strand: int, reg_slice: Slice = None, internal_id: int = None,
+    #              sequence: str = None):
+    #     if not start:
+    #         raise ValueError("Feature start must be specified")
+    #     start = int(start)
+    #     if not end and not length:
+    #         raise ValueError("Either feature end or length must be specified")
+    #     if not end:
+    #         end = start + int(length) - 1
+    #     end = int(end)
+    #     an = Analysis(analysis_name) if analysis_name else None
+    #     loc = Location(start, end)
+    #     st = Strand(strand)
+    #     seq = Sequence(seq_id=None, seq=sequence) if sequence else None
+    #     return cls(loc, st, reg_slice, an, internal_id, seq)
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}(internal_id{self._internal_id}:\
-            {self._slice.region.name}:{self.start}:{self.end})'
+        return f'{self.__class__.__name__}({self._internal_id})'
 
     @property
     def start(self) -> int:
