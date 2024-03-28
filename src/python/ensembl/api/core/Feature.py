@@ -13,7 +13,7 @@
 # limitations under the License.
 """Generic Feature module"""
 
-__all__ = [ "Feature" ]
+__all__ = [ "Feature", "EnsemblFeature" ]
 
 from typing import Union
 import warnings
@@ -27,6 +27,9 @@ class Feature():
     basically describes a location on a sequence in an arbitrary coordinate
     system.
     """
+
+    __type = 'feature'
+
     def __init__(self,
             location: Location,
             strand: Strand,
@@ -61,26 +64,16 @@ class Feature():
         self._sequence = sequence
         self._attributes = {}
 
-    # @classmethod
-    # def fastinit(cls, start: int, end: int, length: int, analysis_name: str,
-    #              strand: int, reg_slice: Slice = None, internal_id: int = None,
-    #              sequence: str = None):
-    #     if not start:
-    #         raise ValueError("Feature start must be specified")
-    #     start = int(start)
-    #     if not end and not length:
-    #         raise ValueError("Either feature end or length must be specified")
-    #     if not end:
-    #         end = start + int(length) - 1
-    #     end = int(end)
-    #     an = Analysis(analysis_name) if analysis_name else None
-    #     loc = Location(start, end)
-    #     st = Strand(strand)
-    #     seq = Sequence(seq_id=None, seq=sequence) if sequence else None
-    #     return cls(loc, st, reg_slice, an, internal_id, seq)
-
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self._internal_id})'
+
+    @property
+    def feature_type(self) -> str:
+        return self.__type
+
+    @property
+    def location(self) -> Location:
+        return self._location
 
     @property
     def start(self) -> int:
@@ -142,16 +135,25 @@ class Feature():
             return  raw_len%self._slice.length + 1
         raise ValueError('Cannot determine length of non-circular feature where start > end')
 
+    @property
+    def seq(self) -> str:
+        raise NotImplementedError()
+
+    @seq.setter
+    def seq(self, value) -> None:
+        raise NotImplementedError()
+
     def set_attribs(self, attribs: dict[str, str]) -> None:
         self._attributes = attribs
 
-    def get_attrib(self, att_code: str = None) -> dict:
-        if att_code is None:
-            return self._attributes
-        return {att_code: self._attributes.get(att_code)}
+    def get_attribs(self) -> dict[str, str]:
+        return self._attributes
 
-    def add_attrib(self, code: str, value: str) -> None:
+    def add_attrib(self, code: str, value: str):
         self._attributes[code] = value
+
+    def get_attrib(self, code: str) -> str:
+        return self._attributes.get(code)
 
     def get_slice(self) -> Slice:
         return self._slice
@@ -160,42 +162,105 @@ class Feature():
         self._slice = gen_slice
 
     def feature_slice(self) -> Slice:
-        if not self._slice:
-            warnings.warn("Cannot create feature Slice for feature without an attached slice")
-            return None
         return Slice(self._slice.region, self._location)
 
     @property
     def seq_region_name(self) -> str:
-        return self._slice.region.name if self._slice else ''
+        return self._slice.region.name
 
 
     #  FROM SLICE - TO BE CONFIRMED!!
     @property
     def seq_region_length(self) -> int:
-        if self._slice:
-            return self._slice.length
-        warnings.warn(f"There is no slice for this feature {self.internal_id}")
-        return None
+        return self._slice.length
 
     @property
     def seq_region_type(self) -> RegionType:
-        if self._slice:
-            return self._slice.region_type
-        return None
+        return self._slice.region_type
 
     @property
-    def coord_system_name(self) -> str:
-        if self._slice:
-            return self._slice.location.coordinate_system.name
-        return None
+    def seq_region_cs(self) -> str:
+        return self._slice.location.coordinate_system.name
 
-    # def get_summary(self) -> dict:
-    #     summary = {}
-    #     summary['id'] = self.internal_id
-    #     summary['version'] = self._version if self._version else ''
-    #     summary['start'] = self.seq_region_start()
-    #     summary['end'] = self.seq_region_end()
-    #     summary['strand'] = self._strand
-    #     summary['seq_region_name'] = self.seq_region_name()
-    #     return summary
+class EnsemblFeature(Feature):
+
+    __type = 'ensembl_feature'
+
+    def __init__(self,
+                 location: Location,
+                 strand: Strand,
+                 reg_slice: Slice,
+                 analysis: Analysis = None,
+                 internal_id: Union[str, int] = None,
+                 sequence: Sequence = None,
+                 biotype: str = None,
+                 source: str = 'ensembl',
+                 stable_id: str = None,
+                 version: int = 1,
+                 is_current: bool = True) -> None:
+        self._stable_id = stable_id
+        self._version = version
+        self._biotype = biotype
+        self._source = source
+        self._is_current = is_current
+        self._attributes = {}
+
+        super().__init__(location, strand, reg_slice, analysis, internal_id, sequence)
+
+
+    def __repr__(self) -> str:
+        if self._stable_id:
+            return f'{self.__class__.__name__}({self._stable_id})'
+        return super().__repr__()
+
+    @property
+    def stable_id_version(self) -> str:
+        return f"{self._stable_id}.{self._version}"
+
+    @property
+    def stable_id(self) -> str:
+        return self._stable_id
+
+    @stable_id.setter
+    def stable_id(self, value: str) -> None:
+        self._stable_id = value
+
+    @property
+    def feature_type(self) -> str:
+        return self.__type
+
+    @property
+    def version(self):
+        return self._version
+
+    @version.setter
+    def version(self, value) -> None:
+        self._version = value
+
+    @property
+    def internal_id(self) -> int:
+        return self._internal_id
+
+    @property
+    def biotype(self) -> str:
+        return self._biotype
+
+    @biotype.setter
+    def biotype(self, value: str) -> None:
+        self._biotype = value
+
+    @property
+    def source(self) -> str:
+        return self._source
+
+    @source.setter
+    def source(self, value: str) -> None:
+        self._source = value
+
+    @property
+    def is_current(self) -> bool:
+        return self._is_current
+
+    @is_current.setter
+    def is_current(self, value: bool) -> None:
+        self._is_current = value

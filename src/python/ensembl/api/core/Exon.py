@@ -17,9 +17,9 @@ __all__ = ["Exon"]
 
 from typing import Union, Self
 import warnings
-from . import Feature, Location, Slice, Strand
+from . import Analysis, EnsemblFeature, Location, Slice, Strand
 
-class Exon(Feature):
+class Exon(EnsemblFeature):
     """Representation of an exon.
     The location of an exon is always provided 5' -> 3' on the forward strand.
     Thus the start should always be lower than the end.
@@ -44,13 +44,14 @@ class Exon(Feature):
     def __init__(self,
                  location: Location,
                  strand: Strand,
-                 phase: int,
-                 end_phase: int,
-                 gen_slice: Slice = None,
+                 reg_slice: Slice,
+                 analysis: Analysis = None,
+                 phase: int = -1,
+                 end_phase: int = -1,
                  internal_id: Union[str, int] = None,
+                 biotype: str = None,
                  stable_id: str = None,
                  version: int = None,
-                 analysis: str = None,
                  is_constitutive: bool = False,
                  is_current: bool = True
                 ) -> None:
@@ -60,63 +61,22 @@ class Exon(Feature):
             raise ValueError(f"Bad value {phase} for exon phase: it must be any of (-1, 0, 1, 2)")
         if end_phase is None:
             raise ValueError("No end phase set in Exon. You must set it explicitly.")
-        self._stable_id = stable_id
-        self._version = version
-        self._slice = gen_slice
         self._phase = phase
         self._end_phase = end_phase
         self._is_constitutive = is_constitutive
-        self._is_current = is_current
-        self._internal_id = internal_id
-        super().__init__(location, strand, gen_slice, analysis, internal_id)
+        super().__init__(location, strand, reg_slice, analysis, internal_id, None,
+                         biotype, 'ensembl', stable_id, version, is_current)
 
     @classmethod
     def fastinit(cls, start: int, end: int, strand: int, gen_slice: Slice,
-                 phase: int = -1, end_phase: int = -1, internal_id: str = None, analysis: str = None) -> Self:
+                 phase: int = -1, end_phase: int = -1, internal_id: str = None,
+                 analysis_name: str = None, biotype: str = None,
+                 stable_id: str = None, version: int = None,
+                 is_constitutive: bool = False, is_current: bool = True) -> Self:
         loc = Location(start, end)
-        return cls(loc, Strand(strand), phase, end_phase, gen_slice, internal_id, None, None, analysis)
-
-    def __repr__(self) -> str:
-        eid = self.stable_id if self._stable_id else self._slice.region.name
-        return f'{self.__class__.__name__}({eid}:{self.start}:{self.end}:{self.strand.value}\
-            -{self.phase}:{self._end_phase})'
-
-    @property
-    def location(self) -> Location:
-        return self._location
-
-    @property
-    def start(self) -> int:
-        return self._location.start
-
-    @property
-    def end(self) -> int:
-        return self._location.end
-
-    @property
-    def stable_id_version(self) -> str:
-        if self._stable_id:
-            return f"{self._stable_id}.{self._version}"
-        return None
-
-    @property
-    def stable_id(self) -> str:
-        return self._stable_id
-
-    @stable_id.setter
-    def stable_id(self, value: str) -> None:
-        if value.find('.') > 0:
-            (self._stable_id, self._version) = value.split('.')
-        else:
-            self._stable_id = value
-
-    @property
-    def version(self):
-        return self._version
-
-    @version.setter
-    def version(self, value) -> None:
-        self._version = value
+        an = Analysis(analysis_name) if analysis_name else None
+        return cls(loc, Strand(strand), gen_slice, an, phase, end_phase, internal_id,
+                   biotype, stable_id, version, is_constitutive, is_current)
 
     @property
     def phase(self) -> int:
@@ -158,18 +118,6 @@ class Exon(Feature):
         if not isinstance(value, bool):
             raise ValueError("New value must be boolean")
         self._is_constitutive = value
-
-    @property
-    def exon_string(self) -> str:
-        return f"{self.start}:{self.end}:{self.strand.value}"
-
-    @property
-    def seq(self) -> str:
-        return self._sequence.seq
-
-    @seq.setter
-    def seq(self, value) -> None:
-        raise NotImplementedError()
 
     def adjust_start_end(self, start_adj: int, end_adj: int) -> Self:
         """

@@ -16,10 +16,10 @@
 __all__ = [ 'Transcript' ]
 
 from typing import Union, Self
-from . import Analysis, Biotype, CoordinateSystem, Exon, Location, Slice, \
-    Sequence, Feature, Strand, Translation
+from . import Analysis, CoordinateSystem, Exon, Location, Slice, \
+    Sequence, EnsemblFeature, Strand, Translation
 
-class Transcript(Feature):
+class Transcript(EnsemblFeature):
     """Representation of a transcript.
 
     TO DO!!!
@@ -53,32 +53,28 @@ class Transcript(Feature):
                  exons: list[Exon] = None,
                  internal_id: Union[str, int] = None,
                  sequence: Sequence = None,
-                 biotype: Biotype = None,
+                 biotype: str = None,
                  source: str = 'ensembl',
                  stable_id: str = None,
                  version: int = 1,
                  is_current: bool = True,
                  is_canonical: bool = False
                 ) -> None:
-        self._stable_id = stable_id
-        self._version = version
         self._exons = [] if not exons else exons
-        self._internal_id = internal_id
-        self._sequence: str = sequence
-        self._biotype = biotype
-        self._source = source
-        self._is_current = is_current
         self._is_canonical = is_canonical
         self._translation = None
         self._coding_region_start: int = None
         self._coding_region_end: int = None
 
-        super().__init__(location, strand, reg_slice, analysis, internal_id)
+        super().__init__(location, strand, reg_slice, analysis, internal_id, sequence,
+                         biotype, source, stable_id, version, is_current)
 
     @classmethod
     def fastinit(cls, start: int, end: int, length: int, analysis_name: str,
                  strand: int, reg_slice: Slice = None, internal_id: int = None,
-                 biotype: str = None, sequence: str = None) -> Self:
+                 biotype: str = None, sequence: str = None, source: str = 'ensembl',
+                 stable_id: str = None, version: int = 1, is_current: bool = True,
+                 is_canonical: bool = False) -> Self:
         if not start:
             raise ValueError("Feature start must be specified")
         start = int(start)
@@ -91,66 +87,13 @@ class Transcript(Feature):
         loc = Location(start, end)
         st = Strand(strand)
         seq = Sequence(seq_id=None, seq=sequence) if sequence else None
-        return cls(loc, st, reg_slice, an, internal_id, seq, biotype)
+        return cls(loc, st, reg_slice, an, internal_id, seq, biotype, source, stable_id,
+                   version, is_current, is_canonical)
 
     def __repr__(self) -> str:
-        if self._stable_id:
-            if self._attributes.get('is_canonical'):
-                return f'{self.__class__.__name__}({self.stable_id} - canonical)'
-            return f'{self.__class__.__name__}({self.stable_id})'
+        if self._attributes.get('is_canonical'):
+            return f'{self.__class__.__name__}({self.stable_id} - canonical)'
         return super().__repr__()
-
-    @property
-    def stable_id_version(self) -> str:
-        return f"{self._stable_id}.{self._version}"
-
-    @property
-    def stable_id(self) -> str:
-        return self._stable_id
-
-    @stable_id.setter
-    def stable_id(self, value: str) -> None:
-        self._stable_id = value
-
-    @property
-    def type(self) -> str:
-        return self.__type
-
-    @property
-    def version(self):
-        return self._version
-
-    @version.setter
-    def version(self, value) -> None:
-        self._version = value
-
-    @property
-    def internal_id(self) -> int:
-        return self._internal_id
-
-    @property
-    def biotype(self) -> Biotype:
-        return self._biotype
-
-    @biotype.setter
-    def biotype(self, value: Biotype) -> None:
-        self._biotype = value
-
-    @property
-    def source(self) -> str:
-        return self._source
-
-    @source.setter
-    def source(self, value: str) -> None:
-        self._source = value
-
-    @property
-    def is_current(self) -> bool:
-        return self._is_current
-
-    @is_current.setter
-    def is_current(self, value: bool) -> None:
-        self._is_current = value
 
     @property
     def is_canonical(self) -> bool:
@@ -181,30 +124,11 @@ class Transcript(Feature):
     def set_exons(self, exons: list[Exon]) -> None:
         self._exons = exons
 
-    def set_attribs(self, attribs: dict[str, str]) -> None:
-        self._attributes = attribs
-
-    def get_attribs(self, att_code: str = None) -> Union[dict, tuple]:
-        if att_code is None:
-            return self._attributes
-        return tuple(att_code, self._attributes.get(att_code))
-
-    def add_attrib(self, code: str, value: str) -> None:
-        self._attributes[code] = value
-
     def is_mane_select(self) -> bool:
         return 'MANE_Select' in self._attributes
 
     def is_mane(self) -> bool:
         return 'mane' in self._attributes.keys().lower()
-
-    @property
-    def seq(self) -> str:
-        raise NotImplementedError()
-
-    @seq.setter
-    def seq(self, value) -> None:
-        raise NotImplementedError()
 
     def coding_region_start(self) -> int:
         if self._coding_region_start:
@@ -213,7 +137,6 @@ class Transcript(Feature):
             return None
         if self._translation.coord_system != CoordinateSystem.GENOMIC:
             raise NotImplementedError
-
         start = 0
         strand = self._translation.start_exon.strand
         if strand == Strand.FORWARD:

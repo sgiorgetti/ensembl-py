@@ -15,10 +15,10 @@
 
 from .Analysis import *
 from .Assembly import *
-from .Biotype import *
 from .Sequence import *
 from .Slice import *
 from .Feature import *
+from .Gene import *
 from .Transcript import *
 from .Exon import *
 from .Translation import *
