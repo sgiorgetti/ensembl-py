@@ -99,7 +99,7 @@ def _build_transcript(reg_slice: Slice, gtf_tr_row: GTFRecord, exons: list[Exon]
     return tr
 
 def parse_gtf(filename: Path) -> list[Feature]:
-    reg_slice = Slice.fastinit('chromosome', "Z", 15000000, 1, 15000000, 1)
+    reg_slice = Slice.fastinit('chromosome', "1", 20000000, 1, 20000000, 1)
     exons = []
     transcripts = []
     genes = []
@@ -113,7 +113,8 @@ def parse_gtf(filename: Path) -> list[Feature]:
                 continue
             gtf_row = GTFRecord.fromGTFRow(line.rstrip())
             if gtf_row.seq_region_name != reg_slice.region.name:
-                continue
+                warnings.warn(f"Found new region {gtf_row.seq_region_name} in file. Stopping parsing.")
+                break
             if gtf_row.feature_type not in ('transcript', 'exon'):
                 warnings.warn(f"Found unmanaged feature type {gtf_row.feature_type}. Skipping ...")
                 continue
