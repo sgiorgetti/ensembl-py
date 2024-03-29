@@ -70,13 +70,12 @@ class Exon(EnsemblFeature):
     @classmethod
     def fastinit(cls, start: int, end: int, strand: int, gen_slice: Slice,
                  phase: int = -1, end_phase: int = -1, internal_id: str = None,
-                 analysis_name: str = None, biotype: str = None,
-                 stable_id: str = None, version: int = None,
+                 analysis_name: str = None, stable_id: str = None, version: int = None,
                  is_constitutive: bool = False, is_current: bool = True) -> Self:
         loc = Location(start, end)
         an = Analysis(analysis_name) if analysis_name else None
         return cls(loc, Strand(strand), gen_slice, an, phase, end_phase, internal_id,
-                   biotype, stable_id, version, is_constitutive, is_current)
+                   None, stable_id, version, is_constitutive, is_current)
 
     @property
     def phase(self) -> int:
@@ -136,13 +135,13 @@ class Exon(EnsemblFeature):
         return Exon(
             new_loc,
             self._strand,
+            self._slice,
+            self._analysis,
             self._phase,
             self._end_phase,
-            self._slice,
             self._internal_id,
+            None, # biotype
             self._stable_id,
             self._version,
-            self._analysis,
             self._is_constitutive,
-            self._is_current
-        )
+            self._is_current)

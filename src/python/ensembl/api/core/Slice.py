@@ -151,8 +151,7 @@ class Region():
 
 class Slice():
     """
-    Slice represent a part of a region, inclusive of an orientation (strand),
-    in a coordinate system (only GENOMIC for now)
+    Slice represent a part of a region, inclusive of an orientation (strand)
     """
     def __init__(self, region: Region, location: Location, strand: Strand) -> None:
         self._region = region
