@@ -15,7 +15,7 @@
 
 __all__ = [ "Translation" ]
 
-from . import CoordinateSystem, Exon, Location
+from . import Exon, Location
 
 class Translation():
     def __init__(self,
@@ -42,10 +42,6 @@ class Translation():
     @property
     def end(self) -> int:
         return self._location.end
-
-    @property
-    def coord_system(self) -> CoordinateSystem:
-        return self._location.coordinate_system
 
     @property
     def start_exon(self) -> Exon:

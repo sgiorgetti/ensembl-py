@@ -141,3 +141,4 @@ data/
 *.gtf
 cache/
 *.ser
+*.bz2

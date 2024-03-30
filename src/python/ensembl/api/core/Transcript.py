@@ -16,7 +16,7 @@
 __all__ = [ 'Transcript' ]
 
 from typing import Union, Self
-from . import Analysis, CoordinateSystem, Exon, Location, Slice, \
+from . import Analysis, Exon, Location, Slice, \
     Sequence, EnsemblFeature, Strand, Translation
 
 class Transcript(EnsemblFeature):
@@ -135,8 +135,6 @@ class Transcript(EnsemblFeature):
             return self._coding_region_start
         if not self._translation:
             return None
-        if self._translation.coord_system != CoordinateSystem.GENOMIC:
-            raise NotImplementedError
         start = 0
         strand = self._translation.start_exon.strand
         if strand == Strand.FORWARD:
@@ -153,8 +151,6 @@ class Transcript(EnsemblFeature):
             return self._coding_region_end
         if not self._translation:
             return None
-        if self._translation.coord_system != CoordinateSystem.GENOMIC:
-            raise NotImplementedError
 
         end = 0
         strand = self._translation.start_exon.strand
