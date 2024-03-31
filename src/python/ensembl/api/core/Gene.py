@@ -18,7 +18,7 @@ __all__ = [ 'Gene' ]
 from typing import Union, Self
 import warnings
 from . import Analysis, Location, Slice, \
-    Sequence, EnsemblFeature, Strand, Transcript
+    Sequence, EnsemblFeature, Strand, Transcript, Exon
 
 class Gene(EnsemblFeature):
 
@@ -78,3 +78,6 @@ class Gene(EnsemblFeature):
             self._transcripts.append(transcripts)
         if isinstance(transcripts, (list, tuple)) and isinstance(transcripts[0], Transcript):
             self._transcripts.extend(transcripts)
+
+    def get_exons(self) -> list[Exon]:
+        return [ e for t in self._transcripts for e in t.get_exons() ]

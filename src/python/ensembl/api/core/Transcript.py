@@ -124,6 +124,12 @@ class Transcript(EnsemblFeature):
     def set_exons(self, exons: list[Exon]) -> None:
         self._exons = exons
 
+    def get_start_exon(self) -> Exon:
+        return self._exons[0]
+
+    def get_end_exon(self) -> Exon:
+        return self._exons[-1]
+
     def is_mane_select(self) -> bool:
         return 'MANE_Select' in self._attributes
 
