@@ -61,6 +61,9 @@ class Exon(EnsemblFeature):
             raise ValueError(f"Bad value {phase} for exon phase: it must be any of (-1, 0, 1, 2)")
         if end_phase is None:
             raise ValueError("No end phase set in Exon. You must set it explicitly.")
+        if not internal_id:
+            internal_id = f"{self.__type}:{reg_slice.region.name}:" +\
+                        f"{location.start}:{location.end}:{strand.value}"
         self._phase = phase
         self._end_phase = end_phase
         self._is_constitutive = is_constitutive
@@ -68,14 +71,18 @@ class Exon(EnsemblFeature):
                          biotype, 'ensembl', stable_id, version, is_current)
 
     @classmethod
-    def fastinit(cls, start: int, end: int, strand: int, gen_slice: Slice,
+    def fastinit(cls, start: int, end: int, strand: int, reg_slice: Slice,
                  phase: int = -1, end_phase: int = -1, internal_id: str = None,
                  analysis_name: str = None, stable_id: str = None, version: int = None,
                  is_constitutive: bool = False, is_current: bool = True) -> Self:
         loc = Location(start, end)
         an = Analysis(analysis_name) if analysis_name else None
-        return cls(loc, Strand(strand), gen_slice, an, phase, end_phase, internal_id,
+        return cls(loc, Strand(strand), reg_slice, an, phase, end_phase, internal_id,
                    None, stable_id, version, is_constitutive, is_current)
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self.seq_region_name}:' +\
+               f"{self._location.start}:{self._location.end}:{self.strand.value})"
 
     @property
     def phase(self) -> int:

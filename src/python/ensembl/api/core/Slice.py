@@ -18,6 +18,7 @@ __all__ = ["Slice", "Location", "LocationModifier", "Region",
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Self
 import warnings
 from . import Sequence, Assembly, Alphabet
 
@@ -77,7 +78,7 @@ class Location():
     def __str__(self) -> str:
         return f'{self.__class__.__name__}({self.start}-{self.end})'
 
-    def __contains__(self, other) -> bool:
+    def __contains__(self, other: Self | int) -> bool:
         if isinstance(other, Location):
             return self.start <= other.start and other.end <= self.end
         if isinstance(other, int):
@@ -85,15 +86,12 @@ class Location():
         warnings.warn(f"Comparing Location with another object ({type(other)})")
         return False
 
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, Location):
-            warnings.warn(f"Cannot compare Location to object type {type(other)}")
-            return False
+    def __eq__(self, other: Self) -> bool:
         if self.start == other.start and self.end == other.end:
             return True
         return False
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: Self) -> bool:
         if not isinstance(other, Location):
             warnings.warn(f"Cannot compare Location to object type {type(other)}")
             return False
@@ -159,34 +157,34 @@ class Slice():
         self._strand = strand
 
     def __repr__(self) -> str:
-        pass
+        return f"{self.__class__.__name__}({self.region_type}:" +\
+                f"{self.region.name}:{self.start}:{self.end}:" +\
+                f"{self.strand.value})"
 
     @classmethod
     def fastinit(cls,
                  seq_region_type: str,
                  seq_region_name: str,
                  seq_region_length: int,
-                 seq_region_start: int,
-                 seq_region_end: int,
-                 seq_region_strand: int,
+                 seq_region_start: int = 1,
+                 seq_region_end: int = 0,
+                 seq_region_strand: int = Strand.FORWARD,
                  seq: str = None,
                  alphabet: str = "DNA"):
         if not seq_region_type:
             raise ValueError("Region type is required")
         if not seq_region_name:
             raise ValueError("Region name argument is required")
-        if seq_region_start is None or seq_region_start <= 0:
+        if int(seq_region_start) <= 0:
             raise ValueError("Invalid Region start: must be positive")
-        if seq_region_end is None or seq_region_end <= 0:
-            raise ValueError("Invalid Region end: must be positive")
-        if seq_region_length <= 0:
+        if int(seq_region_length) <= 0:
             raise ValueError("Invalid Region length: must be positive or None")
-        seq_len = seq_region_end - seq_region_start + 1
-        if not seq_region_length:
-            seq_region_length = seq_len
-        elif seq_region_length != seq_len:
-            raise ValueError(f"Inconsistent provided seq_region_length ({seq_region_length}) \
-                             does not match with start and end ({seq_len})")
+        if int(seq_region_end) == 0:
+            seq_region_end = seq_region_length + seq_region_start - 1
+        seq_len = int(seq_region_end) - seq_region_start + 1
+        if seq_region_length != seq_len:
+            raise ValueError(f"Inconsistent provided seq_region_length ({seq_region_length})",
+                             f"does not match with start and end ({seq_len})")
         if seq and not alphabet:
             raise ValueError("Alphabet is required, when sequence is provided")
         try:

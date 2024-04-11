@@ -65,6 +65,9 @@ class Transcript(EnsemblFeature):
         self._translation = None
         self._coding_region_start: int = None
         self._coding_region_end: int = None
+        if not internal_id:
+            internal_id = f"{self.__type}:{reg_slice.region.name}:" +\
+                        f"{location.start}:{location.end}:{strand.value}"
 
         super().__init__(location, strand, reg_slice, analysis, internal_id, sequence,
                          biotype, source, stable_id, version, is_current)
@@ -91,14 +94,13 @@ class Transcript(EnsemblFeature):
                    version, is_current, is_canonical)
 
     def __repr__(self) -> str:
-        if self._attributes.get('is_canonical'):
-            return f'{self.__class__.__name__}({self.stable_id} - canonical)'
-        return super().__repr__()
+        return f'{self.__class__.__name__}({self.seq_region_name}:' +\
+               f"{self._location.start}:{self._location.end}:{self.strand.value})"
 
     @property
     def is_canonical(self) -> bool:
         return self._is_canonical
-    
+
     @is_canonical.setter
     def is_canonical(self, value: bool) -> None:
         self.is_canonical = value

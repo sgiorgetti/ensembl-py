@@ -15,7 +15,7 @@
 
 __all__ = [ "Feature", "EnsemblFeature" ]
 
-from typing import Union
+from typing import Union, Self
 import warnings
 from . import Analysis, Location, RegionType, Sequence, Slice, Strand
 
@@ -35,7 +35,7 @@ class Feature():
             strand: Strand,
             reg_slice: Slice = None,
             analysis: Analysis = None,
-            internal_id: int = None,
+            internal_id: str = None,
             sequence: Sequence = None
         ) -> None:
 
@@ -66,6 +66,11 @@ class Feature():
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self._internal_id})'
+
+    def __eq__(self, other: Self) -> bool:
+        if self._internal_id == other.internal_id:
+            return True
+        return False
 
     @property
     def feature_type(self) -> str:
@@ -127,12 +132,12 @@ class Feature():
     @property
     def length(self) -> int:
         raw_len = self._location.end - self._location.start
-        if raw_len >= 0:
-            return raw_len + 1
         if self._slice.is_circular():
             # if circular, we can work out the length of an origin-spanning
             # feature using the size of the underlying region.
             return  raw_len%self._slice.length + 1
+        if raw_len >= 0:
+            return raw_len + 1
         raise ValueError('Cannot determine length of non-circular feature where start > end')
 
     @property
@@ -177,10 +182,6 @@ class Feature():
     @property
     def seq_region_type(self) -> RegionType:
         return self._slice.region_type
-
-    @property
-    def seq_region_cs(self) -> str:
-        return self._slice.location.coordinate_system.name
 
 class EnsemblFeature(Feature):
 

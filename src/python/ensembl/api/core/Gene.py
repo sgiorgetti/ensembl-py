@@ -40,6 +40,9 @@ class Gene(EnsemblFeature):
                 #  canonical_transcript_id: int = None,
                 #  canonical_transcript: Transcript = None
         self._transcripts = [] if not transcripts else transcripts
+        if not internal_id:
+            internal_id = f"{self.__type}:{reg_slice.region.name}:" +\
+                        f"{location.start}:{location.end}:{strand.value}"
 
         super().__init__(location, strand, reg_slice, analysis, internal_id, sequence,
                          biotype, source, stable_id, version, is_current)
@@ -56,13 +59,18 @@ class Gene(EnsemblFeature):
             raise ValueError("Either feature end or length must be specified")
         if not end:
             end = start + int(length) - 1
-        end = int(end)
+        if not length:
+            length = int(end) - start + 1
         an = Analysis(analysis_name) if analysis_name else None
         loc = Location(start, end)
         st = Strand(strand)
         seq = Sequence(seq_id=None, seq=sequence) if sequence else None
         return cls(loc, st, reg_slice, an, internal_id, seq, biotype, source,
                    stable_id, version, is_current)
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self.seq_region_name}:' +\
+               f"{self._location.start}:{self._location.end}:{self.strand.value})"
 
     def get_transcripts(self) -> list[Transcript]:
         return self._transcripts
